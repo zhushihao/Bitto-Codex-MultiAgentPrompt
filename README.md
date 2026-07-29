@@ -1,4 +1,4 @@
-# glm-agents
+# Bitto-Codex-MultiAgentPrompt
 
 > 一套**生产级的多 Agent 协作规范**（prompt），面向 GLM-5-2 / Bitto 网关场景。
 > 把本仓库的文件放进你的 Agent 框架，主 Agent 就会按规范自动拆分任务、并行派发给子 Agent、做独立审查，最后给你一份整合好的结果。
@@ -91,7 +91,7 @@
 1. 把本仓库的 `AGENTS.md` 下载/复制到你的**项目根目录**：
    ```bash
    # 在你的项目根目录执行
-   curl -O https://raw.githubusercontent.com/zhushihao/glm-agents/main/AGENTS.md
+   curl -O https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPrompt/main/AGENTS.md
    ```
 2. 确保你的 Agent 框架里配置了三个可用模型：**deepseek-flash、deepseek-pro、glm-5-2**（或通过网关映射成对应名字）。
 3. 正常给 Agent 下任务即可。它会按规范自行决定要不要拆、派给谁、怎么验收。
@@ -161,7 +161,7 @@
 不会。规范把"保留用户和其他人的改动"列为硬约束（I7），任何冲突都先上报，不经你允许不回退。
 
 **Q：这和原 `myprompt` 仓库什么关系？**
-`glm-agents` 是从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）单独拆出来的**公开版本**，方便直接拿来用，不含私有（k3）配置。
+`Bitto-Codex-MultiAgentPrompt` 是从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）单独拆出来的**公开版本**，方便直接拿来用，不含私有（k3）配置。
 
 ---
 
@@ -196,7 +196,7 @@
 
 ## 更新日志
 
-- 2026-07-29：从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）拆出，独立为公开仓库 `glm-agents`；随附面向小白的完整 README。
+- 2026-07-29：从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）拆出，独立为公开仓库 `Bitto-Codex-MultiAgentPrompt`；随附面向小白的完整 README。
 - 规范内核：v5 mailbox 协议（GIT_COMMON_DIR 信箱、规范 JSON、版本化回执）；适配模型 deepseek-flash / deepseek-pro / GLM-5-2。
 
 ---

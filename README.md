@@ -31,6 +31,24 @@
 
 ---
 
+## 推荐搭配：多模型路由工具
+
+本规范需要三个可用模型（deepseek-flash / deepseek-pro / GLM-5-2）。如果你用 **Codex** 作为 Agent 运行环境，又想把多个模型源（官方 OpenAI 订阅、DeepSeek、GLM、Qwen、本地模型等）统一挂到同一个 Codex Provider 下面，推荐搭配：
+
+👉 **[CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti)** —— 面向 Codex 的多模型路由与 Provider 管理桌面工具（Tauri 跨平台，MIT 协议）。
+
+它做的事：在 Codex 后面加一个**本地多模型路由 Provider**。你登录 ChatGPT 订阅、添加 DeepSeek / GLM / 本地模型源后，Codex 只连本地代理，由本地按 `model` 名字把请求分发到不同上游。效果：
+
+- 主 Agent 用官方强模型做规划/决策/质量把关；
+- 执行、审查等可拆分任务路由到廉价 API、本地模型或 DeepSeek / GLM，实测可**省下约一半官方额度**；
+- 三个子 Agent 的模型名（deepseek-flash / deepseek-pro / glm-5-2）直接在路由表里映射好即可。
+
+使用要点：保持 CCSwitchMulti 运行；改完路由规则后**完全退出并重开 Codex Desktop**；模型菜单不显示时用它的"模型菜单解锁流程"启动（运行时注入，不改 app.asar）。中文全流程见 [Codex 多路由使用说明](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
+
+> 注意：本仓库的规范只定义"怎么派活"，模型从哪来、怎么路由由你的平台/网关决定。CCSwitchMulti 是其中一种（Codex 场景）落地方式，不是必须。
+
+---
+
 ## 3 分钟看懂核心概念
 
 不需要记住术语，先有个画面：
@@ -126,6 +144,9 @@
 
 **Q：三个子 Agent 我都要自己申请/付费吗？**
 是的，你需要这三个模型在你的 Agent 框架或网关里可用（名称映射成 deepseek-flash / deepseek-pro / glm-5-2）。规范只负责"派活"，模型本身由你的平台提供。
+
+**Q：怎么把多个模型源（官方 OpenAI / DeepSeek / GLM / 本地模型）统一挂到 Codex 下面？**
+推荐搭配 **[CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti)**（基于 CC Switch 的 Tauri 跨平台桌面工具）。它在 Codex 后面加了一个**本地多模型路由 Provider**：你登录 ChatGPT 订阅 + 添加 DeepSeek / GLM / 本地模型源后，Codex 只连本地代理，由本地按 `model` 名字把请求分发到不同上游。这样主 Agent 用官方强模型、执行/审查任务路由到廉价或本地模型，**实测可省下约一半官方额度**。使用要点：保持 CCSwitchMulti 运行、改完路由规则后完全退出并重开 Codex Desktop、模型菜单不显示时用它的"模型菜单解锁流程"启动。详见其 [Codex 多路由使用说明（中文）](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
 
 **Q：`AGENTS.md` 和 `multi-agent-spec-bitto.txt` 用哪个？**
 用 `AGENTS.md`（除非你的工具不认 Markdown，那就用 `.txt`）。内容一致。

@@ -96,7 +96,9 @@ ORIENT: instructions + directory names + repo status + likely entry points.
 
 CLASSIFY: match M1..M7 triggers. If any trigger hits, or the PRIMARY RISK GATE
   fails, or material ambiguity remains → CLASS = MANDATORY.
-  Otherwise → CLASS = OPTIONAL (delegate directly without gate formality).
+  Otherwise → CLASS = OPTIONAL. Delegate via Codex spawn payload directly —
+  no envelope, no mailbox, no GATE_RECORD. The Codex spawn payload is the
+  contract. Only the task result is routed back through the Codex return channel.
 
 For MANDATORY tasks:
   Publish a GATE_RECORD declaring triggers, tracks, owners, and primary_reserve.
@@ -291,15 +293,14 @@ without materially weakening termination.
 
 DETERMINISTIC FILESYSTEM MAILBOX
 --------------------------------
-The filesystem mailbox provides an authoritative task contract and
-activity-tracking channel that supplements Codex's native spawn payload.
-Use for implementer and fixer (workspace-write agents that can write
-to disk). Read-only agents (code_mapper, reviewer_module,
-reviewer_adversarial, advisor) communicate through Codex's native thread
-return — their OS-level sandbox prevents filesystem writes, so ACK,
-heartbeat, and result files are not available for them.
-Inbound spawn/follow-up messages are optional hints. The authoritative body
-is a control-plane envelope outside the repository worktree.
+The filesystem mailbox provides a reliable task contract for MANDATORY
+tasks where the Codex spawn payload may be empty or incomplete.
+Workspace-write agents (implementer, fixer) use the full mailbox protocol
+with envelope and body_hash verification. Read-only agents (code_mapper,
+reviewer_module, reviewer_adversarial, advisor) try the Codex spawn
+payload first; the envelope is a fallback only when the payload is empty.
+OPTIONAL tasks skip the mailbox entirely — they use Codex spawn payload
+as the sole contract.
 
 Definitions:
   GIT_COMMON_DIR = $(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
@@ -333,20 +334,18 @@ Canonical JSON:
   Shell command substitution strips the trailing newline from the
   workspace-key print, so the hex output is correct despite it. body_hash
   never uses stdout and is immune to this ambiguity.
-Rules (workspace-write agents; read-only agents use the thread-return-only
-path described in their TOML developer_instructions):
+Rules (workspace-write MANDATORY tasks; OPTIONAL tasks skip the mailbox):
 
-Sequence: primary writes the envelope file first, then initiates the Codex
-spawn. The agent's TOML startup instruction tells it to ignore the Codex
-spawn payload and read the envelope instead. This two-step layering
-ensures the envelope is the authoritative contract while Codex manages
-thread lifecycle.
+Sequence: for MANDATORY tasks, primary writes the envelope file first,
+then initiates the Codex spawn. The agent reads the envelope as the
+authoritative contract (the spawn payload may be empty for these tasks).
+For OPTIONAL tasks, the Codex spawn payload IS the contract — no envelope
+is written.
 
-  - Primary atomically publishes each envelope revision: write to a temp
-    file in MAILBOX_ROOT, flush/fsync, os.replace onto the target ENVELOPE
-    path, then perform round-trip body_hash + identity validation before
-    spawn. Identity validation checks that the on-disk envelope matches
-    task_id, revision, and body_hash.
+  - Primary writes each envelope revision as a JSON file directly to the
+    ENVELOPE path, with body_hash computed and embedded in the envelope
+    itself. No temp-file or atomic-replace ceremony — the primary is the
+    sole writer. The agent validates hash integrity on read.
   - Primary MUST NOT hash workspace root, REPO_DIR, or any path outside
     GIT_COMMON_DIR.
   - The same opaque task_id is the spawn task_name.

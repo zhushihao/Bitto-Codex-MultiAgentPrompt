@@ -7,7 +7,7 @@
 
 ## 这是什么？
 
-当你给一个 AI Agent 下一个复杂任务（改一个项目、写一套前端、审一遍代码、整理一份报告）时，单个模型同时做"拆解 + 干活 + 自查"很容易顾此失彼。
+前沿大模型什么都能干——但要拿最贵的模型从规划写到测试再到自查一遍，**烧钱且浪费**。贵的模型该做"决策和把关"，代码执行、文件扫描、机械检查可以交给更便宜的模型并行跑。
 
 本仓库提供的是一份**协作规则书**（`AGENTS.md`）。它告诉主 Agent：
 
@@ -24,10 +24,10 @@
 
 | 文件 | 是什么 | 给谁用 |
 |---|---|---|
-| `AGENTS.md` | 多 Agent 协作规范（Markdown，带完整结构） | **首选**。大多数 Agent 框架直接读项目根目录的 `AGENTS.md` |
-| `multi-agent-spec-bitto.txt` | 同一份规范（纯文本、无格式） | 粘贴到**不支持 Markdown / 富文本**的输入框时（例如某些网关的控制台）使用 |
+| `AGENTS.md` | 多 Agent 协作规范（v5 完整版，44K） — 含信箱协议、心跳机制、审查体系等全套工程保障 | **首选**。大多数 Agent 框架直接读项目根目录的 `AGENTS.md` |
+| `multi-agent-spec-bitto.txt` | Bitto 网关适配版（14K） — 精简了 v5 信箱协议层，保留核心派单/回退/路由逻辑 | 粘贴到 Bitto 网关等 **不支持 Markdown** 的 System Prompt 输入框使用 |
 
-两个文件内容等价，只是格式不同。**二选一**即可，推荐优先用 `AGENTS.md`。
+**两个文件是同一套规范的两个版本，不是完全相同**：`AGENTS.md` 更完整、更工程化（v5 信箱协议、确定性哈希、版本化回执）；`.txt` 版去掉了网关环境不适用的底层通信协议，更适合粘贴到纯文本输入框。根据你的使用方式**二选一**即可。
 
 ---
 
@@ -149,13 +149,13 @@
 推荐搭配 **[CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti)**（基于 CC Switch 的 Tauri 跨平台桌面工具）。它在 Codex 后面加了一个**本地多模型路由 Provider**：你登录 ChatGPT 订阅 + 添加 DeepSeek / GLM / 本地模型源后，Codex 只连本地代理，由本地按 `model` 名字把请求分发到不同上游。这样主 Agent 用官方强模型、执行/审查任务路由到廉价或本地模型，**实测可省下约一半官方额度**。使用要点：保持 CCSwitchMulti 运行、改完路由规则后完全退出并重开 Codex Desktop、模型菜单不显示时用它的"模型菜单解锁流程"启动。详见其 [Codex 多路由使用说明（中文）](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
 
 **Q：`AGENTS.md` 和 `multi-agent-spec-bitto.txt` 用哪个？**
-用 `AGENTS.md`（除非你的工具不认 Markdown，那就用 `.txt`）。内容一致。
+AGENTS.md 是完整版（含 v5 信箱协议），适合放进项目根目录让框架自动读取；`.txt` 是精简版，适合粘贴到 Bitto 网关等纯文本 System Prompt 输入框。用哪个取决于你的使用方式，不要两个都塞。
 
 **Q：子 Agent 会互相乱发任务、无限套娃吗？**
 不会。规范强制所有子 Agent 都是第一层、禁止再开子 Agent（"never spawns"）。只有主 Agent 能派活、能发起审查。
 
 **Q：任务卡住了怎么办？**
-规范里有" inactivity window（ inactivity 窗口）"机制：主 Agent 按难度给每个子 Agent 一个合理的等待窗口，到期还没动静才会探活/判定失联，不会一慢就杀。真卡死会按回退链换人并如实告诉你。
+规范里有"inactivity window（活动窗口）"机制：主 Agent 按难度给每个子 Agent 一个合理的等待窗口，到期还没动静才会探活/判定失联，不会一慢就杀。真卡死会按回退链换人并如实告诉你。
 
 **Q：它会不会偷偷改我项目里不相干的文件？**
 不会。规范把"保留用户和其他人的改动"列为硬约束（I7），任何冲突都先上报，不经你允许不回退。

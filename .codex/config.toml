@@ -1,7 +1,9 @@
 [agents]
 max_concurrent_threads_per_session = 8
 
-# If the mailbox protocol's GIT_COMMON_DIR path is outside the default
-# workspace-write writable root, add it explicitly:
+# The mailbox protocol writes to GIT_COMMON_DIR/codex-agent-mailbox/.
+# In standard setups, .git/ is inside the workspace root and is writable
+# by default under workspace-write sandbox. If your GIT_COMMON_DIR is
+# outside the workspace (git worktrees, detached .git), uncomment below:
 # [sandbox_workspace_write]
 # writable_roots = ["/path/to/git/common/dir"]

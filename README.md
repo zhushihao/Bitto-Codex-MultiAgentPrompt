@@ -31,13 +31,11 @@
 
 ## 配套工具：多模型路由
 
-本规范需要三个可调用的模型（deepseek-flash、deepseek-pro、GLM-5-2）。若使用 **Codex** 作为运行环境，并希望将 OpenAI 订阅、DeepSeek、GLM、本地模型等统一接入同一入口，可关注：
+本规范默认使用三个模型（deepseek-flash、deepseek-pro、GLM-5-2）。**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**——只需确保 Agent 框架中对应的模型名称映射一致即可。多模型路由（将不同模型统一接入同一入口，按 `model` 字段分发请求）属于运行环境配置，可自行搭建或选用现有工具。
 
-> [CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti) —— 面向 Codex 的多模型路由与 Provider 管理桌面工具（Tauri 跨平台，MIT 协议）。
+以 Codex 场景为例，可使用 [CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti) 在 Codex 后方部署本地代理，将 OpenAI 订阅、DeepSeek、GLM、本地模型等统一接入，实现主 Agent 用官方模型决策与把关、执行与审查任务路由至更经济模型的效果。详细配置参见其 [Codex 多路由使用说明](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
 
-它在 Codex 后方部署一个本地代理，按请求中的 `model` 字段将任务分发至不同上游。主 Agent 调用官方模型执行决策与把关，执行与审查任务路由至更经济的模型。详细配置流程参见其 [Codex 多路由使用说明](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
-
-> 注：本规范仅定义 Agent 间的协作逻辑，模型获取与路由由运行环境决定。CCSwitchMulti 是 Codex 场景下的可选落地方式，并非必须。
+> 本规范仅定义 Agent 间的协作逻辑，不绑定特定模型或路由方案。模型选型与路由策略由运行环境决定，是可配置的选项。
 
 ---
 
@@ -128,7 +126,7 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 可以。将 `AGENTS.md` 放至项目根目录即可。规范本身是写给 Agent 阅读的，你只需正常下达任务。
 
 **Q：三个子 Agent 都需要单独申请和付费吗？**
-是的。deepseek-flash、deepseek-pro、GLM-5-2 需要在你使用的 Agent 框架或网关中可用（名称映射一致即可）。本规范仅定义协作逻辑，不提供模型。
+是的，需要在你使用的 Agent 框架或网关中保证对应的模型可用。默认使用 deepseek-flash、deepseek-pro、GLM-5-2；**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**，只需名称映射一致即可。本规范仅定义协作逻辑，不绑定特定模型。
 
 **Q：子 Agent 会互相串扰或无限嵌套吗？**
 不会。规范强制所有子 Agent 处于第一层，禁止再派生子 Agent。只有主 Agent 有权派发任务和发起审查。

@@ -43,12 +43,12 @@ If late, record as stale and do not reopen completed work.
 Spec concept → Codex mechanism:
   GATE_RECORD     → primary outputs as Markdown in the main thread
   Envelope publish → primary writes JSON to GIT_COMMON_DIR before spawn
-  Spawn agent      → Codex spawn_agent (native tool)
+  Spawn agent      → Codex spawn via natural-language delegation
   Agent returns    → Codex thread result (read-only agents) or
                      RESULT_FILE on disk (workspace-write agents)
   Liveness check   → Codex native timeout (read-only) or
                      heartbeat file protocol (workspace-write)
-  Wait / compile   → Codex wait_agent + result compilation (native)
+  Wait / compile   → Codex result compilation
 
 PRIORITIES
 ----------
@@ -219,8 +219,7 @@ A spawn brief MUST NOT proceed unless it contains ALL of:
 Missing any field -> primary fixes the brief before spawning.
 An empty payload is invalid.
 Concurrency is governed by `.codex/config.toml` (`max_concurrent_threads_per_session`). Increase only for genuinely independent work and
-available thread capacity. Implementer and fixer scopes MUST NOT
-Reviewer read-only work runs independently
+available thread capacity. Reviewer read-only work runs independently
 alongside active implementation when scopes do not overlap.
 
 ACTIVITY-BASED WAITING
@@ -305,7 +304,9 @@ Definitions:
   GIT_COMMON_DIR MUST be an absolute path. If GIT_COMMON_DIR is empty or git
   is unavailable (git 2.45+ required for --git-common-dir; earlier versions
   are unsupported), agents use Codex native payload only — the mailbox
-  protocol is not used.
+  protocol is not used. For MANDATORY tasks when git is unavailable,
+  the primary MUST embed the full task brief into the spawn payload;
+  never spawn with an empty payload in this mode.
   workspace_key = first 16 hex chars of SHA256(<GIT_COMMON_DIR> w/o newline)
   Compute      : python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])" "$GIT_COMMON_DIR"
   task_id       = random 12 hex chars + "_" + snake_case_role
@@ -356,9 +357,12 @@ is written.
     workspace-write agents write BRIEF_INVALID to INVALID_RECEIPT and exit
     before any workspace read. Read-only agents exit with an error through
     the Codex return channel — their sandbox prevents filesystem writes.
+    The error message MUST contain the token BRIEF_INVALID and the missing
+    or mismatched fields, so the primary can distinguish envelope failure
+    from other agent errors.
     The primary MUST NOT spawn or retry an agent whose INVALID_RECEIPT
-    exists. The BRIEF_INVALID receipt is final for that task_id.
-    Primary fixes the envelope error and spawns with a fresh task_id.
+    exists (for workspace-write agents) or whose Codex thread return
+    contains BRIEF_INVALID (for read-only agents).
   - Workspace-write agents may write ACK/heartbeat/result/invalid control
     files outside the worktree, and may additionally write only their
     explicitly owned repository files. Read-only agents may NOT write any
@@ -479,9 +483,10 @@ Classification rules:
     verified advisory facts; the primary may spawn exactly one fresh
     reviewer_module replacement in the same review track with the
     same frozen hash. Never run reviewers concurrently. If the replacement
-    also fails, independent review is unmet: use
-    disclosed primary acceptance only when the gate does not require
-    independence, or report the scope as blocked. This is not a
+    also fails, independent review is unmet. If the scope was
+    classified MANDATORY (any M-trigger was hit), independence is
+    required — report the scope as blocked. If no M-trigger was hit
+    (OPTIONAL), disclosed primary acceptance is allowed. This is not a
     review-of-review.
 
 PARALLEL PEER ROLES
@@ -804,8 +809,9 @@ When running without a user:
      approval_policy = "never"
      sandbox_mode = "workspace-write"   # or read-only for analysis-only jobs
      agents.max_concurrent_threads_per_session = 8
-     Run with `--max-turns` and `--max-tokens` to cap unattended execution.
-     Never grant `danger-full-access` in shared CI runners.
+     Cap unattended execution with an external timeout (e.g.
+     `timeout 600 codex exec ...`). Never grant `danger-full-access`
+     in shared CI runners.
   6. The primary MUST NOT fabricate user intent, skip a material safety check,
      or default to unsafe behavior merely because the approval gate is
      non-interactive. When in doubt, BLOCKED_APPROVAL is safer than

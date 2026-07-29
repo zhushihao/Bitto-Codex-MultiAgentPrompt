@@ -9,7 +9,8 @@ scope, decision, failure, and verification result.
 
 ARCHITECTURE
 ------------
-Flat parallel architecture. Codex spawns agents and manages threads; this
+In this spec, "primary" refers to the Codex main agent thread.
+Codex spawns agents and manages threads; this
 spec defines which agents to use, how to decompose work, and what rules
 govern ownership and review. Every sub-agent is depth 1 and MUST NOT spawn.
 Six callable agent IDs exist, organized by model and role:
@@ -39,6 +40,16 @@ advisor is EXPERT_ADVISORY: read-only, owns no files, never blocks a workstream.
 If delivered before the acceptance boundary, verified findings are incorporated.
 If late, record as stale and do not reopen completed work.
 No sub-agent may spawn.
+
+Spec concept → Codex mechanism:
+  GATE_RECORD     → primary outputs as Markdown in the main thread
+  Envelope publish → primary writes JSON to GIT_COMMON_DIR before spawn
+  Spawn agent      → Codex spawn_agent (native tool)
+  Agent returns    → Codex thread result (read-only agents) or
+                     RESULT_FILE on disk (workspace-write agents)
+  Liveness check   → Codex native timeout (read-only) or
+                     heartbeat file protocol (workspace-write)
+  Wait / compile   → Codex wait_agent + result compilation (native)
 
 PRIORITIES
 ----------
@@ -90,8 +101,8 @@ CLASSIFY: match M1..M7 triggers. If any trigger hits, or the PRIMARY RISK GATE
 For MANDATORY tasks:
   Publish a GATE_RECORD declaring triggers, tracks, owners, and primary_reserve.
   Delegate to owners with clear scope, constraints, and acceptance criteria.
-  For each deliverable: targeted_review() → if rejected, return_to_owner()
-  (one correction; still fails → Fallback). Then acceptance() → audit(A1..A12).
+  For each deliverable: targeted_review → if rejected, return_to_owner
+  (one correction; still fails → Fallback). Then acceptance → audit A1–A12.
 
 During delegated execution, the primary's work is limited to P1–P5
 (see PRIMARY-AGENT BOUNDARY). Codex manages agent thread waiting —
@@ -217,6 +228,12 @@ For workspace-write agents: activity windows and heartbeat protocol apply
 in full. Mailbox ACK deadline: 60 seconds. The ACK timeout is an
 observability target and transport-jitter budget only, never a failure
 criterion by itself.
+
+For read-only agents: the primary treats the agent's first meaningful
+tool call or log output within the Codex thread as implicit ACK.
+If Codex signals the agent terminated (timeout, error, or otherwise)
+with no output at all, the primary treats this as a CAPABILITY failure
+and proceeds to the applicable fallback path.
 Before the assigned inactivity window expires, missing ACK or liveness
 response MUST NOT cause interrupt, owner replacement, fallback, or escalation
 when the agent is running; a silent agent is normal while it works.
@@ -256,7 +273,8 @@ Heartbeat rules (workspace-write agents only):
 A liveness probe is permitted only after the full inactivity window expires
 with no newer activity; the 60-second transport grace is preserved after
 that point.
-Stall / death detection sequence:
+Stall / death detection sequence (workspace-write agents only; read-only
+agents rely on Codex native timeout):
   1. Window expiry: primary performs one liveness probe.
   2. A fixed 60-second transport grace is allowed after window expiry.
      No repeated nudges and no extra five-minute generic grace.
@@ -286,7 +304,10 @@ is a control-plane envelope outside the repository worktree.
 Definitions:
   GIT_COMMON_DIR = $(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
   GIT_COMMON_DIR MUST be an absolute path. If GIT_COMMON_DIR is empty or git
-  is unavailable, the delegation gate fails before any spawn. No fallback path probing is allowed.
+  is unavailable (git 2.45+ required for --git-common-dir; earlier versions
+  are unsupported), the delegation gate fails before any spawn. When git is
+  unavailable, agents fall back to Codex native payload only — the mailbox
+  protocol is not used.
   workspace_key = first 16 hex chars of SHA256(<GIT_COMMON_DIR> w/o newline)
   Compute      : python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])" "$GIT_COMMON_DIR"
   task_id       = random 12 hex chars + "_" + snake_case_role
@@ -312,7 +333,15 @@ Canonical JSON:
   Shell command substitution strips the trailing newline from the
   workspace-key print, so the hex output is correct despite it. body_hash
   never uses stdout and is immune to this ambiguity.
-Rules:
+Rules (workspace-write agents; read-only agents use the thread-return-only
+path described in their TOML developer_instructions):
+
+Sequence: primary writes the envelope file first, then initiates the Codex
+spawn. The agent's TOML startup instruction tells it to ignore the Codex
+spawn payload and read the envelope instead. This two-step layering
+ensures the envelope is the authoritative contract while Codex manages
+thread lifecycle.
+
   - Primary atomically publishes each envelope revision: write to a temp
     file in MAILBOX_ROOT, flush/fsync, os.replace onto the target ENVELOPE
     path, then perform round-trip body_hash + identity validation before
@@ -328,14 +357,16 @@ Rules:
   - On startup, the agent performs exactly one direct envelope lookup. It
     MUST NOT scan the workspace merely because the inbound message is empty.
   - Missing, malformed, hash-mismatched, or task-name-mismatched envelope:
-    the agent writes BRIEF_INVALID to INVALID_RECEIPT and exits before any
-    workspace read. The primary MUST NOT spawn or retry an agent whose
-    INVALID_RECEIPT exists. The BRIEF_INVALID receipt is final for that
-    task_id.
-  - Read-only work may write only external ACK/heartbeat/result/invalid
-    control files outside the worktree. Tasks with repository write permission
-    may additionally write only their explicitly owned files. Neither class
-    may write elsewhere.
+    workspace-write agents write BRIEF_INVALID to INVALID_RECEIPT and exit
+    before any workspace read. Read-only agents exit with an error through
+    the Codex return channel — their sandbox prevents filesystem writes.
+    The primary MUST NOT spawn or retry an agent whose INVALID_RECEIPT
+    exists. The BRIEF_INVALID receipt is final for that task_id.
+  - Workspace-write agents may write ACK/heartbeat/result/invalid control
+    files outside the worktree, and may additionally write only their
+    explicitly owned repository files. Read-only agents may NOT write any
+    files — their communication to the primary goes through the Codex
+    native thread return channel exclusively.
   - The primary publishes each envelope revision by overwriting the
     ENVELOPE file with incremented revision and new body_hash. Follow-up
     messages never resend the body.
@@ -348,6 +379,8 @@ Rules:
     that match the current envelope is the result reused, confirming
     content identity in addition to filename. Results from a prior
     revision are never reused, even for the same agent id.
+    Read-only agents skip the RESULT_FILE check — their result is delivered
+    through the Codex return channel, not the filesystem.
   - INVALID_RECEIPT is revision-qualified:
     <task_id>.r<revision>.invalid.json. A stale INVALID_RECEIPT from a
     prior revision is ignored because a corrected fresh revision uses a
@@ -522,7 +555,10 @@ During delegated execution, the primary's work is exhaustively limited to:
       their returned results. For read-only agents, trust Codex's thread
       return mechanism. P0 never writes repository implementation files.
   P1  Read signatures, type and schema declarations, or config keys from at
-      most three files to define an integration contract.
+      most three files to define an integration contract. Files belonging
+      to an active implementer's owned_files range may be concurrently
+      modified; such reads are preliminary — the final contract locks on
+      the implementer's delivered frozen hash.
   P2  Create interface-only stubs in unassigned files, with no business
       logic, when owners need a connection point.
   P3  Resolve a specific conflict between completed outputs, limited to the
@@ -834,6 +870,12 @@ waits only for a bounded explicit dependency deadline; invokes USER DECISION
 GATE for missing consequential authority; otherwise enters the applicable
 valid-failure or fallback path per OWNERSHIP AND FALLBACK.
 
+Read-only agents return the same RESULT / BRIEF_ACK / BRIEF_INVALID
+structure as JSON text through the Codex thread return channel (not as
+filesystem files). The primary extracts the evidence_class, status, and
+findings from the thread output using the same field names as the file
+templates below.
+
 REPORTING AND AUDIT
 -------------------
 Each subagent report MUST include: evidence_class, findings or changes, exact
@@ -926,3 +968,13 @@ implementer, reviewer_module, reviewer_adversarial, advisor, fixer) across
 developer_instructions) moved to .codex/agents/*.toml. Routing heuristics
 replaced by agent self-description. MODEL ROUTER and PARALLEL PEER ROLES
 sections restructured. All agent ID references updated throughout.
+v7: Codex engine mode. Title reframed as "COORDINATION RULES FOR Codex
+ENGINE" with explicit engine-vs-rules separation. STATE MACHINE pseudocode
+replaced with WORKFLOW RULES. MAILBOX and ACTIVITY-BASED WAITING split by
+read-only vs workspace-write agent capability — read-only agents communicate
+exclusively through Codex thread return. Spec-to-Codex tool mapping table
+added. GIT_COMMON_DIR version requirement (git 2.45+) documented with
+fallback. Envelope publish→spawn sequence clarified. RESULT templates
+extended with read-only agent thread-return format. Non-interactive
+environment section added. Fallback chain hardened: CAPABILITY vs POLICY
+failure distinction, cycle limit, approval-blocked detection.

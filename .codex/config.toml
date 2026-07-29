@@ -1,2 +1,7 @@
 [agents]
 max_concurrent_threads_per_session = 8
+
+# If the mailbox protocol's GIT_COMMON_DIR path is outside the default
+# workspace-write writable root, add it explicitly:
+# [sandbox_workspace_write]
+# writable_roots = ["/path/to/git/common/dir"]

@@ -29,8 +29,8 @@ Agent configuration (model, reasoning_effort, sandbox_mode, developer_instructio
 is defined in .codex/agents/*.toml. The primary selects agents by their declared
 descriptions and the task shape, never by model name alone.
 
-Every implementation scope has exactly one writer (I3). implementer and fixer
-MUST NOT write the same file or tightly coupled module concurrently:
+Every implementation scope has exactly one writer (I3).
+  For implementation work:
   - choose implementer when the contract, owned files, and verification are
     already clear;
   - choose fixer when the implementation itself requires advanced synthesis,
@@ -81,7 +81,7 @@ I7   Preserve user and unrelated changes. Report conflicts. Never revert
 I8   All output carries an evidence class (see REVIEW-RESULT ECONOMY).
      Tainted, disproven, stale, or unsafely sourced artifacts MUST be
      explicitly classified and quarantined. Silence does not mean clean. Every agent output MUST include an
-evidence_class and an explicit findings/status summary, even if the
+     evidence_class and an explicit findings/status summary, even if the
 finding is "no issues found".
      A writer produces EXECUTION_EVIDENCE -- its own verification results --
      which is not self-review. EXECUTION_EVIDENCE is reusable evidence but
@@ -305,9 +305,7 @@ with envelope and body_hash verification. Read-only agents (code_mapper,
 reviewer_module, reviewer_adversarial, advisor) in MANDATORY tasks always
 read the envelope as the authoritative contract — the spawn payload is a
 confirmation hint. In OPTIONAL tasks, the spawn payload is the sole
-contract and no envelope exists.
-OPTIONAL tasks skip the mailbox entirely — they use Codex spawn payload
-as the sole contract.
+contract and the mailbox is not used.
 
 Definitions:
   GIT_COMMON_DIR = $(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
@@ -484,7 +482,6 @@ Classification rules:
   - Scope violation: taint only out-of-scope writes/claims.
   - A writer's own verification is retained as EXECUTION_EVIDENCE, not
     self-review.
-  - Never spawn a review of a review.
   - At most one independent reviewer per mandatory review track.
   - If a reviewer fails for any reason, salvage verified facts; spawn
     exactly one fresh reviewer_module replacement with the same frozen hash.
@@ -546,12 +543,12 @@ reviewer.
 
 MODEL ROUTER
 ------------
-Agent selection follows three principles. The detailed role descriptions and
+Agent selection follows three principles:
 
 1. Each agent declares what it handles in its TOML description. The primary
    reads descriptions to match task shape to agent, preferring the cheapest
    capable option first. Escalate only after at least two substantiated indicators of
-insufficiency (tool error, timeout, incorrect output, or explicit
+     insufficiency (tool error, timeout, incorrect output, or explicit
 agent declaration of incapacity).
 
 2. Implementation writers (implementer, fixer) are mutually exclusive per
@@ -627,7 +624,7 @@ TAINTED protocol (I8 + REVIEW-RESULT ECONOMY):
   Unauthorized writes, corrupted or stale content, and disproven claims
   are automatically TAINTED_CONTENT. Unauthorized nesting with no writes
   is CONTROL_VIOLATION; its findings are ADVISORY_UNVERIFIED until
- independently verified.
+  independently verified.
 Taint clearing:
   Only the primary may clear tainted artifacts. Clearing requires a new
   envelope revision with an updated body hash and incremented scope version.
@@ -783,7 +780,7 @@ is required.
   4. If non-material, reversible, within-goal, and no evidence / public /
      risk impact:
      choose the safest reversible default (read-only or no-op); disclose
-the assumption and the chosen default.
+     the assumption and the chosen default.
   5. Any remaining unsafe or unmatched case:
      ask one concise question rather than falling through.
 The materially_affects list is a minimum, not an exhaustive safe harbor: ask

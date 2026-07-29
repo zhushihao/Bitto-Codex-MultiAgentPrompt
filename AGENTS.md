@@ -91,7 +91,7 @@ Apply these rules for every user request and every material scope change.
 Codex handles thread lifecycle; the primary applies business logic at each phase.
 
 ORIENT: instructions + directory names + repo status + likely entry points.
-  If module boundaries, source/test independence, or M-rule triggers are
+  If module boundaries, source/test independence, or M-trigger hits are
   materially unclear, perform bounded read-only orientation first.
 
 CLASSIFY: match M1..M7 triggers. If any trigger hits, or the PRIMARY RISK GATE
@@ -119,7 +119,7 @@ the primary does not run an event loop.
 Scope change during active owners: let in-flight owners deliver their current
 scope; the new gate plans the delta only. Cancel an owner only if the new
 scope invalidates their deliverable.
-Once an M-rule matches, that request/scope remains mandatory through retries,
+Once an M-trigger matches, that request/scope remains mandatory through retries,
 fallback, and re-splitting. Re-splitting may distribute owned deliverables but
 MUST preserve the parent trigger set, required tracks, and gate record; it
 MUST NOT reclassify child work as trivial or optional.
@@ -145,8 +145,8 @@ gate, and assign or reassign an owner before resuming.
 After two CAPSULE_LOSS cycles on the same scope: escalate to the user; do not
 reassign further.
 
-MANDATORY TRIGGERS
-------------------
+M-TRIGGERS
+---------
 M1  Broad scope: entire project, all docs, architecture, overall quality, or
     broad current-state assessment.
 M2  Multiple areas: two or more independent modules, directories, services,
@@ -444,6 +444,10 @@ narrow classification:
     before the acceptance boundary. May guide a targeted check but cannot
     prove a gate. Not independent review and not an acceptance gate by
     itself.
+  DISCOVERY_EVIDENCE
+    Read-only exploration output — structured evidence maps, entry-point
+    traces, call chains, cross-module coupling reports. Produced by
+    code_mapper. Informs downstream planning but does not prove a gate.
   INDEPENDENT_REVIEW
     Separate read-only reviewer output (reviewer_module medium or
     reviewer_adversarial xhigh). Satisfies review gate when required.
@@ -878,7 +882,7 @@ After completing the assigned task, the agent MUST respond with:
   scope_version: <echoed from envelope>
   status: <complete | incomplete | blocked>
   evidence_class: <EXECUTION_EVIDENCE | INDEPENDENT_REVIEW | EXPERT_ADVISORY
-    | ADVISORY_UNVERIFIED>
+    | ADVISORY_UNVERIFIED | DISCOVERY_EVIDENCE>
   difficulty: <echoed from envelope>
   inactivity_window_seconds: <echoed from envelope>
   findings_or_changes: <concrete summary>
@@ -898,6 +902,10 @@ structure as JSON text through the Codex thread return channel (not as
 filesystem files). The primary extracts the evidence_class, status, and
 findings from the thread output using the same field names as the file
 templates below.
+
+TAINTED_CONTENT and CONTROL_VIOLATION are secondary classifications applied
+by the primary during acceptance — agents do not self-report these classes
+in their RESULT.
 
 REPORTING AND AUDIT
 -------------------

@@ -103,7 +103,8 @@ CLASSIFY: match M1..M7 triggers. If any trigger hits, or the PRIMARY RISK GATE
 For MANDATORY tasks:
   Publish a GATE_RECORD declaring triggers, tracks, owners, and primary_reserve.
   Delegate to owners with clear scope, constraints, and acceptance criteria.
-  For each deliverable: targeted_review → if rejected, return_to_owner
+  For each deliverable: primary assigns reviewer_module (module-level scope)
+  or reviewer_adversarial (cross-module scope) → if rejected, return_to_owner
   (one correction; still fails → Fallback). Then acceptance → audit A1–A12.
 
 During delegated execution, the primary's work is limited to P1–P5
@@ -627,8 +628,9 @@ Bounded fallback:
   4. Reviewer may diagnose or review, but MUST NOT implement. Reviewer never
      receives owned_files and never writes the implementation.
   5. After the applicable implementer-to-fixer or direct-fixer retry chain fails, direct
-     primary takeover is allowed only under the existing last-resort
-     disclosure rules; otherwise report blocked. Do not invent another
+     primary takeover is allowed only when the primary names the orchestration
+     failure and all fallback attempts in the final response (A12);
+     otherwise report blocked. Do not invent another
      implementation model.
 A valid failure requires:
   - a tool error,

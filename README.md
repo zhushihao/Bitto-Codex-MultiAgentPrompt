@@ -23,15 +23,16 @@
 
 | 文件 | 用途 | 使用方式 |
 |---|---|---|
-| `AGENTS.md` | 多 Agent 协作规范（完整版，约 44K）——包含任务派发、并行执行、独立审查、信箱协议、心跳与回退机制 | 放至项目根目录（多数 Agent 框架会自动加载）；如需纯文本粘贴，直接复制此文件内容即可 |
+| `AGENTS.md` | 多 Agent 协作规范（完整版，约 44K）——包含任务派发、并行执行、独立审查、信箱协议、心跳与回退机制 | 放至项目根目录（多数 Agent 框架会自动加载） |
+| `.codex/agents/*.toml` | 6 个专用子 Agent 定义文件，各含模型、推理强度、沙箱模式及独立行为指令 | Codex 自动读取；其他框架可忽略，以 AGENTS.md 内联角色描述为准 |
 
-仓库只保留一个规范文件，没有多余版本。
+仓库包含规范主文档和 Codex 原生的 agent 配置。
 
 ---
 
 ## 配套工具：多模型路由
 
-本规范默认使用三个模型（deepseek-flash、deepseek-pro、GLM-5-2）。**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**——只需确保 Agent 框架中对应的模型名称映射一致即可。多模型路由（将不同模型统一接入同一入口，按 `model` 字段分发请求）属于运行环境配置，可自行搭建或选用现有工具。
+本规范使用三个底层模型（deepseek-flash、deepseek-pro、GLM-5-2），通过 6 个角色化子 Agent 按任务场景分工（见 `.codex/agents/` 目录）。**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**——只需确保 Agent 框架中对应的模型名称映射一致即可。多模型路由（将不同模型统一接入同一入口，按 `model` 字段分发请求）属于运行环境配置，可自行搭建或选用现有工具。
 
 以 Codex 场景为例，可使用 [CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti) 在 Codex 后方部署本地代理，将 OpenAI 订阅、DeepSeek、GLM、本地模型等统一接入，实现主 Agent 用官方模型决策与把关、执行与审查任务路由至更经济模型的效果。详细配置参见其 [Codex 多路由使用说明](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
 
@@ -44,13 +45,16 @@
 ![多 Agent 协作架构](architecture.svg)
 
 - **主 Agent（primary）**：承担项目经理角色——拆解任务、派发工单、等待交付、逐项验收、整合为一份完整响应。**其自身不参与业务代码编写。**
-- **三个子 Agent**（均为第一层，禁止再开子 Agent）：
-  - **deepseek-flash**：执行主力。负责定义清晰的功能开发、跨模块对接、前端页面、测试用例、CI/文档与仓库组装。
-  - **deepseek-pro**：只读审查员。负责架构风险评估、安全审计、失败路径验证、边界条件检查。**只挑错，不写实现。**
-  - **GLM-5-2**：高级攻坚手。处理模糊需求、跨系统集成、高难度可视化、长上下文、高风险实施或需要"救场"的任务。
+- **六个子 Agent**（均为第一层，禁止再开子 Agent）：
+  - **code_mapper**（deepseek-flash·只读）：探索与证据图绘制，不写代码。
+  - **implementer**（deepseek-flash·可写）：定义清晰的功能开发、跨模块对接、前端页面、测试用例、CI/文档与仓库组装。
+  - **reviewer_module**（deepseek-pro·只读）：模块级独立审查——检查正确性、测试覆盖、行为回归，返回具体缺陷。
+  - **reviewer_adversarial**（deepseek-pro·只读）：全局对抗性审查——跨模块拉通寻找架构级风险、合约违反、数据暴露路径。
+  - **advisor**（GLM-5-2·只读）：架构仲裁与非阻塞咨询，不持文件所有权。
+  - **fixer**（GLM-5-2·可写）：高难度/跨域/救场实现，处理模糊需求、安全关键任务与 implementer 失败后的恢复。
 - **信箱通信（mailbox）**：主 Agent 与子 Agent 之间以存放在 Git 公共目录下的**结构化工单（envelope）**进行通信。每个工单包含唯一编号、版本号和内容指纹，确保消息不丢失、不重复、不混淆。
 - **触发条件（M1–M7）**：规范定义了 7 类"必须启动正式拆解流程"的场景——包括项目级评估、跨模块变更、发布操作、非平凡前端任务等。命中任一条件，主 Agent 必须走完整派单流程。
-- **回退机制（fallback）**：deepseek-flash 连续两次无法完成同一块任务时，主 Agent 将该范围移交至 GLM-5-2 处理；仅当此链路仍失败时，主 Agent 自行兜底并在响应中如实披露。
+- **回退机制（fallback）**：implementer 连续两次无法完成同一块任务时，主 Agent 将该范围移交至 fixer 处理；仅当此链路仍失败时，主 Agent 自行兜底并在响应中如实披露。
 
 ---
 
@@ -67,7 +71,7 @@ git clone https://github.com/zhushihao/Bitto-Codex-MultiAgentPrompt.git
 curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPrompt/main/AGENTS.md
 ```
 
-确认 Agent 框架中三个模型可用（deepseek-flash、deepseek-pro、glm-5-2，名称映射一致即可）。之后正常下达任务即可，主 Agent 会自动依规处理。
+确认 Agent 框架中三个底层模型可用（deepseek-flash、deepseek-pro、GLM-5-2，名称映射一致即可）。若使用 Codex，`.codex/agents/` 目录中的 TOML 文件会自动配置六类子 Agent；其他框架直接基于 `AGENTS.md` 的角色描述工作。之后正常下达任务，主 Agent 会自动依规处理。
 
 ### 备选：作为 system prompt 粘贴
 
@@ -109,7 +113,7 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 **Q：完全不了解 prompt 工程，可以使用吗？**
 可以。将 `AGENTS.md` 放至项目根目录即可。规范本身是写给 Agent 阅读的，你只需正常下达任务。
 
-**Q：三个子 Agent 都需要单独申请和付费吗？**
+**Q：六个子 Agent 都需要单独申请和付费吗？**
 是的，需要在你使用的 Agent 框架或网关中保证对应的模型可用。默认使用 deepseek-flash、deepseek-pro、GLM-5-2；**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**，只需名称映射一致即可。本规范仅定义协作逻辑，不绑定特定模型。
 
 **Q：子 Agent 会互相串扰或无限嵌套吗？**

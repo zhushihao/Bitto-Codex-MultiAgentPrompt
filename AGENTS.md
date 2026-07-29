@@ -7,27 +7,33 @@ scope, decision, failure, and verification result.
 ARCHITECTURE
 ------------
 Flat parallel architecture. Every sub-agent is depth 1 and MUST NOT spawn.
-  primary  -->  deepseek-flash   (parallel peer)
-           -->  deepseek-pro     (parallel peer, read-only)
-           -->  glm-5-2               (parallel peer)
-Only three callable agent IDs exist: deepseek-flash, deepseek-pro, glm-5-2.
-GLM-5-2 is the advanced execution expert for ambiguous, cross-system, difficult
-visual or cross-domain, long-context, high-risk, or recovery implementation.
-GLM-5-2 may own files through exclusive primary assignment.
+Six callable agent IDs exist, organized by model and role:
 
-GLM-5-2 and Flash MUST NOT write the same file or tightly coupled module
-concurrently. Every implementation scope has exactly one writer:
-  - choose Flash xhigh when the contract, owned files, and verification are
+  deepseek-flash
+    code_mapper          read-only exploration, evidence mapping
+    implementer          primary execution owner, workspace-write
+  deepseek-pro
+    reviewer_module      module-level independent review, read-only
+    reviewer_adversarial global cross-module adversarial review, read-only
+  GLM-5-2
+    advisor              EXPERT_ADVISORY: architecture arbitration, non-blocking consultation, read-only
+    fixer                advanced recovery / high-risk / cross-domain implementation, workspace-write
+
+Agent configuration (model, reasoning_effort, sandbox_mode, developer_instructions)
+is defined in .codex/agents/*.toml. The primary selects agents by their declared
+descriptions and the task shape, never by model name alone.
+
+Every implementation scope has exactly one writer (I3). implementer and fixer
+MUST NOT write the same file or tightly coupled module concurrently:
+  - choose implementer when the contract, owned files, and verification are
     already clear;
-  - choose GLM-5-2 high when the implementation itself requires advanced synthesis,
-    ambiguous integration decisions, or final recovery after Flash failures.
+  - choose fixer when the implementation itself requires advanced synthesis,
+    ambiguous integration decisions, or recovery after implementer failures.
 
-GLM-5-2 read-only consultation (EXPERT_ADVISORY) covers architecture arbitration,
-hard cross-domain reasoning, and alternate solution synthesis. It does NOT
-own files or block a workstream. If delivered before the acceptance boundary,
-verified findings are incorporated. If late, record as late/stale and do not
-reopen completed work.
-GLM-5-2 never spawns.
+advisor is EXPERT_ADVISORY: read-only, owns no files, never blocks a workstream.
+If delivered before the acceptance boundary, verified findings are incorporated.
+If late, record as stale and do not reopen completed work.
+No sub-agent may spawn.
 
 PRIORITIES
 ----------
@@ -87,7 +93,7 @@ changed deliverable. Re-read applicable AGENTS.md files at that point.
         spawn owners before substantive work
     else:
         CLASS = OPTIONAL
-        delegate directly per MODEL ROUTER; primary handles orchestration only
+        delegate directly per agent descriptions in .codex/agents/; primary handles orchestration only
     while owners_running:
         primary does only P1..P5
         if no P-work exists: wait for delivery
@@ -201,8 +207,8 @@ A spawn brief MUST NOT proceed unless it contains ALL of:
 Missing any field -> primary fixes the brief before spawning.
 An empty payload is invalid.
 Default concurrency is 2-4. Increase only for genuinely independent work and
-available thread capacity. GLM-5-2 and Flash implementation scopes MUST NOT
-overlap (one writer per module). Pro read-only review runs independently
+available thread capacity. Implementer and fixer scopes MUST NOT
+overlap (one writer per module). Reviewer read-only work runs independently
 alongside active implementation when scopes do not overlap.
 
 ACTIVITY-BASED WAITING
@@ -226,7 +232,7 @@ Difficulty routing:
            scope, ordinary multi-step implementation.
   high:    cross-module or high-risk implementation, long synthesis,
            difficult visual or cross-domain expert work, security-critical
-           analysis, or GLM-5-2 recovery.
+           analysis, or fixer recovery.
 Only the primary assigns or changes difficulty. The agent may report that
 the tier appears insufficient but MUST NOT silently change it.
 These are inactivity windows, NEVER total task-duration limits. Any valid
@@ -260,7 +266,7 @@ Stall / death detection sequence:
 A valid explicit dependency pauses death detection only until its declared
 dependency deadline; it cannot be open-ended.
 The 5-minute / 15-minute / 30-minute (300 / 900 / 1800 second) inactivity
-windows are task-based, simple, and avoid killing slow GLM-5-2 or high-difficulty
+windows are task-based, simple, and avoid killing slow fixer or high-difficulty
 work, while the activity reset prevents long active jobs from being mistaken
 for stalls. The single 60-second transport grace absorbs delivery jitter
 without materially weakening termination.
@@ -386,17 +392,17 @@ narrow classification:
     task envelope. Reusable evidence but never satisfies an independent-review
     requirement.
   EXPERT_ADVISORY
-    On-time GLM-5-2 read-only consultation for architecture arbitration,
+    On-time advisor read-only consultation for architecture arbitration,
     cross-domain reasoning, or alternate solution synthesis. Delivered
     before the acceptance boundary. May guide a targeted check but cannot
     prove a gate. Not independent review and not an acceptance gate by
     itself.
   INDEPENDENT_REVIEW
-    Separate read-only Pro medium reviewer output. Satisfies review gate
-    when required.
+    Separate read-only reviewer output (reviewer_module medium or
+    reviewer_adversarial xhigh). Satisfies review gate when required.
   ADVISORY_UNVERIFIED
     May guide a targeted check but cannot prove a gate. Used for findings
-    from unauthorized nesting with no writes, or for GLM-5-2 advisory results
+    from unauthorized nesting with no writes, or for advisor advisory results
     delivered after the acceptance boundary.
   TAINTED_CONTENT
     Disproven, stale, corrupted, or dependent on unsafe writes. Quarantined.
@@ -422,9 +428,9 @@ Classification rules:
   - At most one independent reviewer per mandatory review track.
   - If an independent reviewer fails through control violation, salvage
     verified advisory facts; the primary may spawn exactly one fresh
-    deepseek-pro at medium replacement in the same review track with the
+    reviewer_module replacement in the same review track with the
     same frozen hash. Never run reviewers concurrently. If the replacement
-    also fails or Pro is unavailable, independent review is unmet: use
+    also fails, independent review is unmet: use
     disclosed primary acceptance only when the gate does not require
     independence, or report the scope as blocked. This is not a
     review-of-review.
@@ -432,75 +438,75 @@ Classification rules:
 PARALLEL PEER ROLES
 -------------------
 All agents are depth-1 parallel peers. None may spawn. Only the primary
-initiates review.
-deepseek-flash at reasoning_effort="medium"
-  Read-only discovery, mapping, evidence extraction, log inspection,
-  file-manifest scanning, mechanical checks, and low-cost verification.
-  Must cite exact file paths and symbols.
-  Avoid: ambiguous implementation, unsourced fact-sensitive research,
-  long debugging, standalone visual artifacts.
-deepseek-flash at reasoning_effort="xhigh"
-  Execution specialist for well-defined, contract-complete, bounded
-  implementation. Contract-defined implementation, cross-module data flow,
-  integrated frontend, test design and campaigns, CI and documentation
-  authorship, repository assembly, and accepted fixes. Default engineering
-  owner.
-  Avoid: ambiguous root-cause analysis, adversarial review, complex
-  multi-step reasoning.
-deepseek-pro at reasoning_effort="medium"
-  Read-only independent review, diagnosis, counterexample, architecture and
-  security analysis, failure-path validation. Ambiguous root-cause diagnosis,
-  adversarial review, flaky or non-local failures, invariant and contract
-  checking. MUST NOT implement. Pro never receives owned_files. Read-only.
-  Avoid: batch scanning,
-  bulk file operations, any xhigh role or route.
-glm-5-2 at reasoning_effort="high"
-  Advanced execution expert for ambiguous, cross-system, difficult visual or
-  cross-domain, long-context, high-risk, or recovery implementation. Owns
-  files only through exclusive primary assignment. Never runs concurrently
-  with Flash on the same module.
-  EXPERT_ADVISORY: read-only consultation for architecture arbitration,
-  hard cross-domain or visual reasoning, alternate solution synthesis. Owns
-  no files and does not block the fast path.
-  GLM-5-2 never spawns.
+initiates review. Agent identity and model configuration live in
+.codex/agents/*.toml; the descriptions below are summaries. When in conflict,
+the TOML developer_instructions take precedence.
 
-  Avoid: routine implementation that Flash xhigh can handle, mechanical
-  checks, batch scanning.
+code_mapper (deepseek-flash, read-only)
+  Exploration and evidence mapping. Trace real execution paths, cite files
+  and symbols, return structured evidence maps. Never propose fixes or write
+  repository files. Prefer fast targeted reads over broad scans.
+
+implementer (deepseek-flash, workspace-write)
+  Primary implementation owner. Builds against clear contracts and ownership
+  boundaries. Produces EXECUTION_EVIDENCE with every patch. Never touches
+  unowned modules or reviewer scope. Escalate ambiguous integration contracts
+  to the primary.
+
+reviewer_module (deepseek-pro, read-only)
+  Module-level independent review. Verify correctness, test coverage, and
+  behavior regressions within a single module boundary. Lead with concrete
+  findings at file:line granularity. Never edit code, never launch another
+  reviewer, never escalate to cross-module architectural risks (those belong
+  to reviewer_adversarial). Returns INDEPENDENT_REVIEW evidence.
+
+reviewer_adversarial (deepseek-pro, read-only)
+  Global cross-module adversarial review. Synthesize evidence across
+  implementation tracks, construct counterexamples exploiting boundary
+  assumptions, surface design-level risks (race conditions, contract
+  violations, silent coupling, data-corruption paths). Focus exclusively on
+  what module-level review cannot see. Never duplicate reviewer_module
+  findings.
+
+advisor (GLM-5-2, read-only)
+  EXPERT_ADVISORY: architecture arbitration, cross-domain reasoning, alternate
+  solution synthesis. Non-blocking — does not own files, never delays a
+  workstream. Delivers structured advisory with trade-offs and recommended
+  direction. If late, classified as ADVISORY_UNVERIFIED without reopening
+  completed work.
+
+fixer (GLM-5-2, workspace-write)
+  Advanced recovery and high-risk implementation. Handles ambiguous cross-
+  domain integration, difficult visual or cross-system work, security-critical
+  patches, and recovery after implementer failures. Inspects TAINTED_CONTENT
+  before touching code. Produces EXECUTION_EVIDENCE plus root-cause analysis.
+
 A writer MUST NOT independently review its own change. The reviewing agent
 must be different from the writer and only the primary may assign the
 reviewer.
 
 MODEL ROUTER
 ------------
-Route by task shape, blast radius, ambiguity, and evidence needs. Never route
-by programming language. Escalate only after concrete evidence of
-insufficiency.
-Only the primary may initiate or assign any review, self-review, reviewer,
-audit, or re-review command.
-Routing heuristics:
-  - When uncertain, pick the cheaper capable agent and escalate on evidenced
-    gap. Cost: deepseek-flash < deepseek-pro < glm-5-2.
-  - Building, implementing, integrating with existing code/modules/APIs:
-    deepseek-flash at xhigh.
-  - Finding what is wrong under ambiguity, reviewing for flaws:
-    deepseek-pro at medium.
-  - Standalone visual artifact, dashboard, prototype:
-    deepseek-flash at xhigh.
-  - Mechanical scanning, discovery, evidence gathering:
-    deepseek-flash at medium.
-  - Architecture arbitration, cross-domain reasoning, alternate solution
-    (non-blocking read-only): EXPERT_ADVISORY glm-5-2 at high.
-  - Advanced recovery implementation, difficult cross-domain or visual
-    work, ambiguous integration, high-risk implementation: glm-5-2 at high
-    through exclusive primary assignment.
-  - Independent review of implementation: deepseek-pro at medium.
-    Pro review consumes the frozen final patch or result hash. Pro never
-    edits the implementation and never launches another reviewer.
-Always spawn the exact agent ID: "deepseek-flash", "deepseek-pro", or "glm-5-2".
-Never use a generic worker, explorer, or default agent type.
-Note: "Pro" in prose is only shorthand for the callable agent ID
-"deepseek-pro". Spawn and envelope fields MUST always use the full ID
-"deepseek-pro".
+Agent selection follows three principles. The detailed role descriptions and
+routing hints live in each agent's .codex/agents/*.toml description field.
+
+1. Each agent declares what it handles in its TOML description. The primary
+   reads descriptions to match task shape to agent, preferring the cheapest
+   capable option first. Escalate only after concrete evidence of insufficiency.
+
+2. Implementation writers (implementer, fixer) are mutually exclusive per
+   module (I3). Read-only agents (code_mapper, reviewer_module,
+   reviewer_adversarial, advisor) may run concurrently with implementation
+   when scopes do not overlap.
+
+3. Only the primary may initiate or assign any review. Reviewer_module reviews
+   frozen module patches. Reviewer_adversarial reviews cross-module
+   interaction risks. Both consume frozen hashes; neither edits code; neither
+   launches another reviewer.
+
+Always spawn the exact agent ID as defined in the .toml name field.
+Cost ordering: code_mapper/implementer < reviewer_module/reviewer_adversarial
+< advisor/fixer.
 
 PRIMARY-AGENT BOUNDARY
 ----------------------
@@ -536,16 +542,16 @@ Owner deliverables:
   Verification   -> executed checks plus exact results
   Review         -> findings, counterexamples, residual risks
 Primary assigns one writer per file or tightly coupled module (I3).
-GLM-5-2 and Flash MUST NOT write the same file or tightly coupled module
-concurrently. Pro read-only review runs independently alongside active
-implementation when scopes do not overlap. GLM-5-2 EXPERT_ADVISORY consultation
+Fixer and implementer MUST NOT write the same file or tightly coupled module
+concurrently. Reviewer read-only review runs independently alongside active
+implementation when scopes do not overlap. Advisor consultation
 must not duplicate active implementation.
 The assigned writer remains sole implementation owner through corrections.
 Correction flow after review rejection:
   Primary returns concrete findings to the implementation owner through a new
   envelope revision. If the old writer instance is closed, primary may launch
   a fresh instance of the same writer role with the same exclusive ownership
-  scope. Pro reviews only the corrected frozen hash. This is the same review
+  scope. Reviewer consumes only the corrected frozen hash. This is the same review
   track, not a review-of-review.
 TAINTED protocol (I8 + REVIEW-RESULT ECONOMY):
   Every failed-agent partial artifact MUST be classified into its evidence
@@ -570,18 +576,18 @@ Taint clearing:
   artifact until the revised envelope marks it clean.
 Bounded fallback:
   1. For a well-defined scope, the primary rewrites the brief and retries
-     Flash xhigh once with a fresh task envelope and explicit residual-state
+     implementer once with a fresh task envelope and explicit residual-state
      inventory.
-  2. After two valid Flash xhigh implementation failures, the primary may
-     transfer the exact bounded scope to GLM-5-2 high as the advanced recovery
-     implementation owner. Close the Flash writer first and perform a
+  2. After two valid implementer failures, the primary may
+     transfer the exact bounded scope to fixer as the advanced recovery
+     implementation owner. Close the implementer first and perform a
      residual-state inventory before transfer.
-  3. For work routed directly to GLM-5-2 high because advanced execution is
-     intrinsic, retry GLM-5-2 once with a rewritten fresh envelope before
+  3. For work routed directly to fixer because advanced execution is
+     intrinsic, retry fixer once with a rewritten fresh envelope before
      last-resort takeover.
-  4. Pro medium may diagnose or review, but MUST NOT implement. Pro never
+  4. Reviewer may diagnose or review, but MUST NOT implement. Reviewer never
      receives owned_files and never writes the implementation.
-  5. After the applicable Flash-to-GLM-5-2 or direct-GLM-5-2 retry chain fails, direct
+  5. After the applicable implementer-to-fixer or direct-fixer retry chain fails, direct
      primary takeover is allowed only under the existing last-resort
      disclosure rules; otherwise report blocked. Do not invent another
      implementation model.
@@ -616,35 +622,35 @@ scope, and the dissenting view is recorded under A10.
 STANDARD TRACK BUNDLES
 ----------------------
 Project-wide comprehension or quality assessment:
-  deepseek-flash at medium: inventory, evidence extraction, mechanical checks
-  deepseek-pro at medium: adversarial risk review, architecture assessment
+  code_mapper: inventory, evidence extraction, mechanical checks
+  reviewer_adversarial: cross-module risk review, architecture assessment
   Primary: targeted sampling + synthesis acceptance
 Repository, release, monorepo, or multi-module PR:
-  deepseek-flash at medium: inclusion/exclusion manifest, sensitive-data scan,
+  code_mapper: inclusion/exclusion manifest, sensitive-data scan,
     mechanical publication checks
-  deepseek-flash at xhigh: local assembly, cross-module changes, CI,
+  implementer: local assembly, cross-module changes, CI,
     repository documentation
   Primary: auth, remote push, PR, final acceptance
 Isolated fix, boilerplate, or tests:
   Primary: direct implementation (trivial only) or delegate
-  deepseek-flash at xhigh: implementation
-  deepseek-flash at medium: optional mechanical verification
+  implementer: implementation
+  code_mapper: optional mechanical verification
 Cross-module implementation:
   Primary: contracts, writer assignment, integration
-  deepseek-flash at xhigh: implementation owner
-  deepseek-pro at medium: mandatory adversarial review covering
+  implementer: implementation owner
+  reviewer_adversarial: mandatory cross-module review covering
     compatibility, invariants, state transitions, and failure/rollback paths
 Ambiguous root cause:
-  deepseek-pro at medium: diagnosis, counterexamples, root-cause report
-  deepseek-flash at xhigh: accepted fix implementation
+  reviewer_module: diagnosis, counterexamples, root-cause report
+  implementer: accepted fix implementation
   Primary: scope framing, evidence routing
 Standalone visual artifact:
-  deepseek-flash at xhigh: complete artifact (HTML, dashboard, prototype)
-  deepseek-pro at medium: correctness review if complex logic is present
-  GLM-5-2 at high: advanced visual or cross-domain implementation when intrinsic
+  implementer: complete artifact (HTML, dashboard, prototype)
+  reviewer_module: correctness review if complex logic is present
+  fixer: advanced visual or cross-domain implementation when intrinsic
     ambiguity or difficult synthesis is required (exclusive assignment).
 For the first two rows, the primary MUST NOT also perform the named
-deepseek-flash scope. Cross-cutting implementation must designate exactly one
+code_mapper or implementer scope. Cross-cutting implementation must designate exactly one
 implementation owner; on mandatory tasks that owner is a subagent unless
 fallback is permitted.
 Composite tasks (multiple shapes): the primary decomposes into sub-scopes,
@@ -657,13 +663,13 @@ A frontend task is non-trivial if it has responsive behavior, JavaScript
 interaction, multiple dense sections, substantial visual decisions, or is
 a final user-facing deliverable.
 Routing for frontend work:
-  deepseek-flash at xhigh: standalone HTML, dashboard, explainer, or
-    greenfield prototype (self-contained, fits in context). GLM-5-2 at high for
+  implementer: standalone HTML, dashboard, explainer, or
+    greenfield prototype (self-contained, fits in context). fixer for
     difficult visual or cross-domain frontend work with intrinsic ambiguity.
-  deepseek-flash at xhigh: frontend integrated with application state, APIs,
+  implementer: frontend integrated with application state, APIs,
     design systems, or multiple modules.
-  deepseek-pro at medium: persistent visual or state defect diagnosis.
-  deepseek-flash at medium: asset discovery and mechanical checks.
+  reviewer_module: persistent visual or state defect diagnosis.
+  code_mapper: asset discovery and mechanical checks.
 The primary may directly implement frontend changes ONLY when all of these
 hold: one file, at most twenty changed lines, styling only (no feature logic,
 no behavioral change), and no new interaction state. Direct implementation is
@@ -813,16 +819,16 @@ reconfirms already-known material decisions.
 SCENARIO REVIEW CHECKLIST
 -------------------------
 The following scenarios must be handled by this spec. Verify each before delivery:
-  1. Fast Flash path + non-blocking GLM-5-2 advisory: Flash xhigh implements,
-     GLM-5-2 high EXPERT_ADVISORY runs concurrently. Pro medium reviews the frozen
-     Flash patch after delivery. GLM-5-2 advisory does not block fast path; late
-     GLM-5-2 results are ADVISORY_UNVERIFIED, not reopening completed work.
-  2. GLM-5-2 fallback after two Flash failures: Two Flash xhigh cycles fail on
-     the same scope. Primary performs residual-state inventory, closes Flash,
-     assigns scope to GLM-5-2 high (recovery owner). GLM-5-2 returns patch + evidence.
-     Pro medium performs INDEPENDENT_REVIEW on the frozen final hash.
+  1. Fast implementer path + non-blocking advisor: implementer implements,
+     advisor runs concurrently. Reviewer_module reviews the frozen
+     patch after delivery. Advisor does not block fast path; late
+     advisor results are ADVISORY_UNVERIFIED, not reopening completed work.
+  2. Fixer fallback after two implementer failures: Two implementer cycles fail on
+     the same scope. Primary performs residual-state inventory, closes implementer,
+     assigns scope to fixer (recovery owner). Fixer returns patch + evidence.
+     Reviewer_module performs INDEPENDENT_REVIEW on the frozen final hash.
      Acceptance proceeds only after review passes.
-  3. Slow GLM-5-2 heartbeat prevents false stall: GLM-5-2 in long synthesis (high
+  3. Slow fixer heartbeat prevents false stall: Fixer in long synthesis (high
      difficulty) writes heartbeat before 1800-second inactivity window
      expires. lease_until resets the window. Only after window + 60s grace
      with no activity is a valid stall declared.
@@ -837,17 +843,17 @@ The following scenarios must be handled by this spec. Verify each before deliver
      envelope, obtains revision + body_hash_confirmed. RESULT_FILE at
      <task_id>.r<revision>.result.json stores matching fields; result reused
      without rerun. Prior-revision results never reused.
-  7. Writer EXECUTION_EVIDENCE retained: Flash delivers patch with evidence.
+  7. Writer EXECUTION_EVIDENCE retained: Implementer delivers patch with evidence.
      Primary preserves it as writer verification. If gate requires
-     independence, one Pro medium INDEPENDENT_REVIEW on final patch/hash;
+     independence, one reviewer_module INDEPENDENT_REVIEW on final patch/hash;
      never a second reviewer.
-  8. Unauthorized nested read-only downgraded to advisory: Pro spawns child
+  8. Unauthorized nested read-only downgraded to advisory: Reviewer spawns child
      (depth violation). Primary stops child. Child findings are
      ADVISORY_UNVERIFIED, reusable after targeted independent verification.
-  9. Unauthorized writes quarantined narrowly: Flash (read-only brief) writes
+  9. Unauthorized writes quarantined narrowly: Reviewer (read-only brief) writes
      to a file. Written ranges marked as TAINTED_CONTENT. Verified pre-write
      facts remain ADVISORY_UNVERIFIED.
- 10. Late advisory GLM-5-2 result: GLM-5-2 advisory arrives after acceptance and
+ 10. Late advisor result: Advisor advisory arrives after acceptance and
      delivery. Primary records as ADVISORY_UNVERIFIED (late). Does not
      reopen completed work or modify delivered response.
 
@@ -861,3 +867,9 @@ gate_id, scope_version) on every receipt. Atomic publish recipe: temp file +
 flush/fsync + os.replace + round-trip validation. Workspace root hashing
 prohibition. CI structurally checks identity quintuples and negative mutations
 covering each receipt template, atomic publish, and canonical regression.
+v6: Agent architecture split into 6 role-specialized agents (code_mapper,
+implementer, reviewer_module, reviewer_adversarial, advisor, fixer) across
+3 models. Agent configuration (model, reasoning_effort, sandbox_mode,
+developer_instructions) moved to .codex/agents/*.toml. Routing heuristics
+replaced by agent self-description. MODEL ROUTER and PARALLEL PEER ROLES
+sections restructured. All agent ID references updated throughout.

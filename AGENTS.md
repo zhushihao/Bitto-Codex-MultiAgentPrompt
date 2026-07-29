@@ -107,6 +107,10 @@ For MANDATORY tasks:
   or reviewer_adversarial (cross-module scope) → if rejected, return_to_owner
   (one correction; still fails → Fallback). Then acceptance → audit A1–A12.
 
+The acceptance boundary is reached when all owners have delivered and all
+required review tracks have passed. After this point, the primary no longer
+accepts new sub-agent input — only integration verification (P5) remains.
+
 During delegated execution, the primary's work is limited to P1–P5
 (see PRIMARY-AGENT BOUNDARY). Codex manages agent thread waiting —
 the primary does not run an event loop.
@@ -450,6 +454,14 @@ narrow classification:
   CONTROL_VIOLATION
     Process failure. Classify each affected artifact or claim separately
     rather than tainting all output automatically.
+
+frozen hash: before review, the primary computes SHA256 of the
+implementer or fixer deliverable files and locks the review scope to
+that hash. The reviewer confirms the hash matches before beginning,
+ensuring the implementation is not altered during review. Distinct
+from the envelope body_hash — this is the deliverable content fingerprint,
+not the task metadata fingerprint.
+
 Classification rules:
   - Subagents MUST NOT spawn, invoke, request, or assign a self-review,
     reviewer, audit agent, or review-of-review.

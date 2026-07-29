@@ -229,7 +229,9 @@ generic timeouts. Heartbeat-file tracking applies to workspace-write agents
 (implementer, fixer) that can write to disk. Read-only agents
 (code_mapper, reviewer_module, reviewer_adversarial, advisor) rely on
 Codex's native timeout and return through the agent thread — the primary
-treats a returned result as implicit liveness.
+treats a returned result as implicit liveness. If a read-only agent
+remains unresponsive beyond the high-difficulty inactivity window
+(1800 seconds), primary may treat it as a CAPABILITY failure.
 
 For workspace-write agents: activity windows and heartbeat protocol apply
 in full. Mailbox ACK deadline: 60 seconds. The ACK timeout is an
@@ -335,10 +337,9 @@ Canonical JSON:
 Rules (workspace-write MANDATORY tasks; OPTIONAL tasks skip the mailbox):
 
 Sequence: for MANDATORY tasks, primary writes the envelope file first,
-then initiates the Codex spawn. The agent reads the envelope as the
-authoritative contract (the spawn payload may be empty for these tasks).
-For OPTIONAL tasks, the Codex spawn payload IS the contract — no envelope
-is written.
+then initiates the Codex spawn. The primary MUST include the task_id in
+the spawn instruction so the agent can locate its envelope. For OPTIONAL
+tasks, the Codex spawn payload is the contract — no envelope is written.
 
   - Primary writes each envelope revision as a JSON file directly to the
     ENVELOPE path, with body_hash computed and embedded in the envelope
@@ -634,7 +635,7 @@ Bounded fallback:
   1. For a well-defined scope, the primary rewrites the brief and retries
      implementer once with a fresh task envelope and explicit residual-state
      inventory.
-  2. After two valid implementer failures, the primary may
+  2. After two valid implementer failures, the primary MUST
      transfer the exact bounded scope to fixer as the advanced recovery
      implementation owner. Close the implementer first and perform a
      residual-state inventory before transfer.
@@ -888,7 +889,9 @@ After completing the assigned task, the agent MUST respond with:
   required_parent_action: <explicit next step for the parent>
 
 When status is "blocked": the primary consumes required_parent_action;
-waits only for a bounded explicit dependency deadline; invokes USER DECISION
+waits for the agent's assigned inactivity window as the deadline. If the
+dependency remains unmet after the deadline, classify as CAPABILITY failure
+and follow the fallback chain for that agent type. Do not invoke USER DECISION
 GATE for missing consequential authority; otherwise enters the applicable
 valid-failure or fallback path per OWNERSHIP AND FALLBACK.
 

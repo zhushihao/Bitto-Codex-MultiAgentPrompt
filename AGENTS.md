@@ -105,7 +105,9 @@ For MANDATORY tasks:
   Delegate to owners with clear scope, constraints, and acceptance criteria.
   For each deliverable: primary assigns reviewer_module (module-level scope)
   or reviewer_adversarial (cross-module scope) → if rejected, return_to_owner
-  (one correction; still fails → Fallback). Then acceptance → audit A1–A12.
+  (one correction within the same attempt; still fails → FALLBACK chain
+  rule 1 provides a second, independent attempt).
+  Then acceptance → audit A1–A12.
 
 The acceptance boundary is reached when all owners have delivered and all
 required review tracks have passed. After this point, the primary no longer
@@ -365,6 +367,8 @@ is written.
     the Codex return channel — their sandbox prevents filesystem writes.
     The primary MUST NOT spawn or retry an agent whose INVALID_RECEIPT
     exists. The BRIEF_INVALID receipt is final for that task_id.
+    Primary fixes the envelope error, assigns a fresh task_id, and spawns
+    a new agent — never reuses the invalid task_id.
   - Workspace-write agents may write ACK/heartbeat/result/invalid control
     files outside the worktree, and may additionally write only their
     explicitly owned repository files. Read-only agents may NOT write any
@@ -644,6 +648,12 @@ Bounded fallback:
      failure and all fallback attempts in the final response (A12);
      otherwise report blocked. Do not invent another
      implementation model.
+  6. Read-only agent CAPABILITY failure: spawn one fresh instance of the
+     same agent type on the same scope. If the replacement also fails —
+     code_mapper: primary performs bounded orientation directly;
+     reviewer_module / reviewer_adversarial: disclosed primary acceptance;
+     advisor: advisory is skipped (non-blocking). POLICY failures on
+     read-only agents follow the same BLOCKED_APPROVAL rules as writers.
 A valid failure requires:
   - a tool error,
   - agent failure or closure,
@@ -675,7 +685,8 @@ Generic five-minute stall timers and model-specific leases are replaced by
 difficulty-based inactivity windows with transport grace.
 Scope drift to an unrelated project or module after one correction =
 immediate valid failure. Skip the second attempt on the same agent; escalate
-directly.
+directly to the applicable FALLBACK path (implementer → fixer;
+fixer → primary takeover).
 READ-ONLY constraint = no file create, no file edit, no file delete, no
 git add, commit, push, or checkout, no mkdir. Report what WOULD be done;
 do NOT execute. Violation = immediate valid failure, no correction round.

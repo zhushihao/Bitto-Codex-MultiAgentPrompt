@@ -160,9 +160,6 @@ AGENTS.md 是完整版（含 v5 信箱协议），适合放进项目根目录让
 **Q：它会不会偷偷改我项目里不相干的文件？**
 不会。规范把"保留用户和其他人的改动"列为硬约束（I7），任何冲突都先上报，不经你允许不回退。
 
-**Q：这和原 `myprompt` 仓库什么关系？**
-`Bitto-Codex-MultiAgentPrompt` 是从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）单独拆出来的**公开版本**，方便直接拿来用，不含私有（k3）配置。
-
 ---
 
 ## 术语表（随手查）
@@ -196,11 +193,10 @@ AGENTS.md 是完整版（含 v5 信箱协议），适合放进项目根目录让
 
 ## 更新日志
 
-- 2026-07-29：从 `myprompt` 的 `Business/`（GLM-5-2 / Bitto 版）拆出，独立为公开仓库 `Bitto-Codex-MultiAgentPrompt`；随附面向小白的完整 README。
-- 规范内核：v5 mailbox 协议（GIT_COMMON_DIR 信箱、规范 JSON、版本化回执）；适配模型 deepseek-flash / deepseek-pro / GLM-5-2。
+- 2026-07-29：初始发布。面向 GLM-5-2 / Bitto 网关的多 Agent 协作规范，v5 mailbox 协议（GIT_COMMON_DIR 信箱、规范 JSON、版本化回执）；适配模型 deepseek-flash / deepseek-pro / GLM-5-2。
 
 ---
 
 ## License
 
-本仓库内容按原 `myprompt` 仓库约定使用；如需明确授权协议，请在 fork / 使用前与作者确认。
+MIT License — 可自由使用、修改、分发。详见 [LICENSE](LICENSE) 文件。

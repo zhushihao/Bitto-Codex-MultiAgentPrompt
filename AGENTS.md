@@ -122,7 +122,7 @@ On compaction resume, reconstruct this capsule before acting:
   class: OPTIONAL | MANDATORY(Mx...)
   phase: orient | delegated | review | acceptance | fallback
   owners: agent -> scope/files -> deliverable -> status
-  primary_reserve: P-rule(s) — decomposition, contract decisions, conflicts, and acceptance
+  active_p_rule: <current P-rule the primary was executing, P0–P5>
   decisions: confirmed choices and assumptions
   fallbacks: attempt / evidence / status
   verification: completed checks + pending checks

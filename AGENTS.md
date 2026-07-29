@@ -12,7 +12,7 @@ ARCHITECTURE
 In this spec, "primary" refers to the Codex main agent thread.
 Codex spawns agents and manages threads; this
 spec defines which agents to use, how to decompose work, and what rules
-govern ownership and review. Every sub-agent is depth 1 and MUST NOT spawn.
+govern ownership and review.
 Six callable agent IDs exist, organized by model and role:
 
   deepseek-flash
@@ -39,7 +39,6 @@ MUST NOT write the same file or tightly coupled module concurrently:
 advisor is EXPERT_ADVISORY: read-only, owns no files, never blocks a workstream.
 If delivered before the acceptance boundary, verified findings are incorporated.
 If late, record as stale and do not reopen completed work.
-No sub-agent may spawn.
 
 Spec concept → Codex mechanism:
   GATE_RECORD     → primary outputs as Markdown in the main thread
@@ -221,7 +220,7 @@ Missing any field -> primary fixes the brief before spawning.
 An empty payload is invalid.
 Concurrency is governed by `.codex/config.toml` (`max_concurrent_threads_per_session`). Increase only for genuinely independent work and
 available thread capacity. Implementer and fixer scopes MUST NOT
-overlap (one writer per module). Reviewer read-only work runs independently
+Reviewer read-only work runs independently
 alongside active implementation when scopes do not overlap.
 
 ACTIVITY-BASED WAITING
@@ -264,17 +263,9 @@ the tier appears insufficient but MUST NOT silently change it.
 These are inactivity windows, NEVER total task-duration limits. Any valid
 heartbeat, tool evidence, result, or explicitly reported blocking dependency
 resets the current inactivity window.
-During a long phase, the agent writes a heartbeat with:
-  - task_id: <echoed from envelope>
-  - revision: <echoed from envelope>
-  - body_hash_confirmed: <echoed from envelope>
-  - gate_id: <echoed from envelope>
-  - scope_version: <echoed from envelope>
-  - progress_summary
-  - lease_until (absolute timestamp = now + inactivity_window_seconds)
-  - blocking dependency (if any)
-  - difficulty
-  - inactivity_window_seconds
+Heartbeat file format is defined in DETERMINISTIC FILESYSTEM MAILBOX
+(HEARTBEAT template). Key fields: progress_summary, lease_until,
+blocking dependency, difficulty, inactivity_window_seconds.
 Heartbeat rules (workspace-write agents only):
   - implementer and fixer are activity-heartbeat enabled.
   - Recommended heartbeat cadence is no more than half the assigned
@@ -367,8 +358,7 @@ is written.
     the Codex return channel — their sandbox prevents filesystem writes.
     The primary MUST NOT spawn or retry an agent whose INVALID_RECEIPT
     exists. The BRIEF_INVALID receipt is final for that task_id.
-    Primary fixes the envelope error, assigns a fresh task_id, and spawns
-    a new agent — never reuses the invalid task_id.
+    Primary fixes the envelope error and spawns with a fresh task_id.
   - Workspace-write agents may write ACK/heartbeat/result/invalid control
     files outside the worktree, and may additionally write only their
     explicitly owned repository files. Read-only agents may NOT write any
@@ -496,7 +486,9 @@ Classification rules:
 
 PARALLEL PEER ROLES
 -------------------
-All agents are depth-1 parallel peers. None may spawn. Only the primary
+All agents are depth-1 parallel peers. A writer MUST NOT independently
+review its own change — review MUST come from a different agent assigned
+by the primary. Only the primary
 initiates review. Agent identity and model configuration live in
 .codex/agents/*.toml; the descriptions below are summaries. When in conflict,
 the TOML developer_instructions take precedence.
@@ -524,8 +516,8 @@ reviewer_adversarial (deepseek-pro, read-only)
   implementation tracks, construct counterexamples exploiting boundary
   assumptions, surface design-level risks (race conditions, contract
   violations, silent coupling, data-corruption paths). Focus exclusively on
-  what module-level review cannot see. Never duplicate reviewer_module
-  findings.
+  what module-level review cannot see. Never edit code, never duplicate
+  reviewer_module findings.
 
 advisor (glm-5-2, read-only)
   EXPERT_ADVISORY: architecture arbitration, cross-domain reasoning, alternate
@@ -547,14 +539,13 @@ reviewer.
 MODEL ROUTER
 ------------
 Agent selection follows three principles. The detailed role descriptions and
-routing hints live in each agent's .codex/agents/*.toml description field.
 
 1. Each agent declares what it handles in its TOML description. The primary
    reads descriptions to match task shape to agent, preferring the cheapest
    capable option first. Escalate only after concrete evidence of insufficiency.
 
 2. Implementation writers (implementer, fixer) are mutually exclusive per
-   module (I3). Read-only agents (code_mapper, reviewer_module,
+   module. Read-only agents (code_mapper, reviewer_module,
    reviewer_adversarial, advisor) may run concurrently with implementation
    when scopes do not overlap.
 
@@ -645,14 +636,12 @@ Bounded fallback:
   3. For work routed directly to fixer because advanced execution is
      intrinsic, retry fixer once with a rewritten fresh envelope before
      last-resort takeover.
-  4. Reviewer may diagnose or review, but MUST NOT implement. Reviewer never
-     receives owned_files and never writes the implementation.
-  5. After the applicable implementer-to-fixer or direct-fixer retry chain fails, direct
+  4. After the applicable implementer-to-fixer or direct-fixer retry chain fails, direct
      primary takeover is allowed only when the primary names the orchestration
      failure and all fallback attempts in the final response (A12);
      otherwise report blocked. Do not invent another
      implementation model.
-  6. Read-only agent CAPABILITY failure: spawn one fresh instance of the
+  5. Read-only agent CAPABILITY failure: spawn one fresh instance of the
      same agent type on the same scope. If the replacement also fails —
      code_mapper: primary performs bounded orientation directly;
      reviewer_module / reviewer_adversarial: disclosed primary acceptance;
@@ -739,7 +728,7 @@ code_mapper or implementer scope. Cross-cutting implementation must designate ex
 implementation owner; on mandatory tasks that owner is a subagent unless
 fallback is permitted.
 Composite tasks (multiple shapes): the primary decomposes into sub-scopes,
-applies one bundle per sub-scope, and enforces I3 (one writer) across shared
+applies one bundle per sub-scope, and enforces one-writer ownership across shared
 files.
 
 FRONTEND RULE

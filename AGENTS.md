@@ -308,7 +308,6 @@ Definitions:
   is unavailable (git 2.45+ required for --git-common-dir; earlier versions
   are unsupported), agents use Codex native payload only — the mailbox
   protocol is not used.
-  protocol is not used.
   workspace_key = first 16 hex chars of SHA256(<GIT_COMMON_DIR> w/o newline)
   Compute      : python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])" "$GIT_COMMON_DIR"
   task_id       = random 12 hex chars + "_" + snake_case_role

@@ -122,7 +122,7 @@ On compaction resume, reconstruct this capsule before acting:
   class: OPTIONAL | MANDATORY(Mx...)
   phase: orient | delegated | review | acceptance | fallback
   owners: agent -> scope/files -> deliverable -> status
-  primary_reserve: P-rule(s)
+  primary_reserve: P-rule(s) — decomposition, contract decisions, conflicts, and acceptance
   decisions: confirmed choices and assumptions
   fallbacks: attempt / evidence / status
   verification: completed checks + pending checks
@@ -306,8 +306,8 @@ Definitions:
   GIT_COMMON_DIR = $(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
   GIT_COMMON_DIR MUST be an absolute path. If GIT_COMMON_DIR is empty or git
   is unavailable (git 2.45+ required for --git-common-dir; earlier versions
-  are unsupported), the delegation gate fails before any spawn. When git is
-  unavailable, agents fall back to Codex native payload only — the mailbox
+  are unsupported), agents use Codex native payload only — the mailbox
+  protocol is not used.
   protocol is not used.
   workspace_key = first 16 hex chars of SHA256(<GIT_COMMON_DIR> w/o newline)
   Compute      : python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])" "$GIT_COMMON_DIR"
@@ -957,9 +957,9 @@ v4: Git common-directory base, canonical bytes (no stdout newline),
 revision-qualified receipts including INVALID_RECEIPT, fresh task_id after
 correction, regression tests for all v4 clauses.
 v5: Uniform identity quintuple (task_id, revision, body_hash_confirmed,
-gate_id, scope_version) on every receipt. Atomic publish recipe: temp file +
-flush/fsync + os.replace + round-trip validation. Workspace root hashing
-prohibition. CI structurally checks identity quintuples and negative mutations
+gate_id, scope_version) on every receipt. Canonical JSON body_hash
+computation. Workspace root hashing prohibition. CI structurally checks
+identity quintuples and negative mutations
 covering each receipt template, atomic publish, and canonical regression.
 v6: Agent architecture split into 6 role-specialized agents (code_mapper,
 implementer, reviewer_module, reviewer_adversarial, advisor, fixer) across

@@ -41,7 +41,8 @@ If delivered before the acceptance boundary, verified findings are incorporated.
 If late, record as stale and do not reopen completed work.
 
 Spec concept → Codex mechanism:
-  GATE_RECORD     → primary outputs as Markdown in the main thread
+  GATE_RECORD     → primary outputs as Markdown in the main thread;
+                     also writes a JSON backup to MAILBOX_ROOT for recovery
   Envelope publish → primary writes JSON to GIT_COMMON_DIR before spawn
   Spawn agent      → Codex spawn via natural-language delegation
   Agent returns    → Codex thread result (read-only agents) or
@@ -79,7 +80,9 @@ I7   Preserve user and unrelated changes. Report conflicts. Never revert
      without explicit permission.
 I8   All output carries an evidence class (see REVIEW-RESULT ECONOMY).
      Tainted, disproven, stale, or unsafely sourced artifacts MUST be
-     explicitly classified and quarantined. Silence does not mean clean.
+     explicitly classified and quarantined. Silence does not mean clean. Every agent output MUST include an
+evidence_class and an explicit findings/status summary, even if the
+finding is "no issues found".
      A writer produces EXECUTION_EVIDENCE -- its own verification results --
      which is not self-review. EXECUTION_EVIDENCE is reusable evidence but
      never satisfies an independent-review requirement.
@@ -126,7 +129,7 @@ On compaction resume, reconstruct this capsule before acting:
   STATE_CAPSULE
   goal: newest user goal
   class: OPTIONAL | MANDATORY(Mx...)
-  phase: orient | delegated | review | acceptance | fallback
+  phase: orient | delegated | review | acceptance | fallback | delivered
   owners: agent -> scope/files -> deliverable -> status
   active_p_rule: <current P-rule the primary was executing, P0–P5>
   decisions: confirmed choices and assumptions
@@ -184,7 +187,8 @@ The primary may directly perform ONLY work that is:
     migration, or non-trivial UI.
 A risk-gate hit on any of the following reclassifies the task as MANDATORY
 even if the file count appears trivial: security, public contract, data,
-publication, migration, irreversible state, or any other material risk.
+publication, migration, irreversible state, material ambiguity that
+    persists after bounded orientation, or any other material risk.
 Ambiguity alone does not force delegation -- the primary first performs
 bounded read-only orientation to determine whether a trigger matches.
 Only when a trigger matches or material ambiguity remains after bounded
@@ -195,8 +199,10 @@ regardless of file count.
 
 GATE RECORD AND BRIEF
 ---------------------
-A mandatory task MUST visibly publish a gate record before substantive tool
-use:
+A mandatory task MUST visibly publish a gate record before spawning
+agents or committing code. Orientation reads (browsing files to determine
+M-triggers) are exempt from this rule.
+GATE_RECORD template:
   GATE_RECORD
   triggers: Mx, My             // "none(ambiguous)" when no trigger matches
   tracks:
@@ -231,7 +237,7 @@ generic timeouts. Heartbeat-file tracking applies to workspace-write agents
 Codex's native timeout and return through the agent thread — the primary
 treats a returned result as implicit liveness. If a read-only agent
 remains unresponsive beyond the high-difficulty inactivity window
-(1800 seconds), primary may treat it as a CAPABILITY failure.
+(1800 seconds), primary MUST treat it as a CAPABILITY failure.
 
 For workspace-write agents: activity windows and heartbeat protocol apply
 in full. Mailbox ACK deadline: 60 seconds. The ACK timeout is an
@@ -296,8 +302,10 @@ The filesystem mailbox provides a reliable task contract for MANDATORY
 tasks where the Codex spawn payload may be empty or incomplete.
 Workspace-write agents (implementer, fixer) use the full mailbox protocol
 with envelope and body_hash verification. Read-only agents (code_mapper,
-reviewer_module, reviewer_adversarial, advisor) try the Codex spawn
-payload first; the envelope is a fallback only when the payload is empty.
+reviewer_module, reviewer_adversarial, advisor) in MANDATORY tasks always
+read the envelope as the authoritative contract — the spawn payload is a
+confirmation hint. In OPTIONAL tasks, the spawn payload is the sole
+contract and no envelope exists.
 OPTIONAL tasks skip the mailbox entirely — they use Codex spawn payload
 as the sole contract.
 
@@ -410,12 +418,9 @@ Envelope must contain:
   - constraints
   - tainted_entries
   - reasoning_effort
-  - review_class
   - deadline
   - difficulty
   - inactivity_window_seconds
-  - may_spawn (false)
-  - max_depth (1)
   - verification
   - return_contract
   - owner
@@ -458,10 +463,11 @@ narrow classification:
     Process failure. Classify each affected artifact or claim separately
     rather than tainting all output automatically.
 
-frozen hash: before review, the primary computes SHA256 of the
-implementer or fixer deliverable files and locks the review scope to
-that hash. The reviewer confirms the hash matches before beginning,
-ensuring the implementation is not altered during review. Distinct
+frozen hash: the implementer or fixer reports the SHA256 of its
+deliverable files as part of EXECUTION_EVIDENCE. The primary uses
+this self-reported hash as the review anchor. The reviewer confirms
+the hash before beginning, ensuring the implementation is not altered
+during review. Frozen hash is distinct from envelope body_hash. Distinct
 from the envelope body_hash — this is the deliverable content fingerprint,
 not the task metadata fingerprint.
 
@@ -480,22 +486,18 @@ Classification rules:
     self-review.
   - Never spawn a review of a review.
   - At most one independent reviewer per mandatory review track.
-  - If an independent reviewer fails through control violation, salvage
-    verified advisory facts; the primary may spawn exactly one fresh
-    reviewer_module replacement in the same review track with the
-    same frozen hash. Never run reviewers concurrently. If the replacement
-    also fails, independent review is unmet. If the scope was
-    classified MANDATORY (any M-trigger was hit), independence is
-    required — report the scope as blocked. If no M-trigger was hit
-    (OPTIONAL), disclosed primary acceptance is allowed. This is not a
-    review-of-review.
+  - If a reviewer fails for any reason, salvage verified facts; spawn
+    exactly one fresh reviewer_module replacement with the same frozen hash.
+    Never run reviewers concurrently. If the replacement also fails,
+    independent review is unmet. MANDATORY → report scope as blocked.
+    OPTIONAL → disclosed primary acceptance. This is not a review-of-review.
 
 PARALLEL PEER ROLES
 -------------------
 All agents are depth-1 parallel peers. A writer MUST NOT independently
 review its own change — review MUST come from a different agent assigned
-by the primary. Only the primary
-initiates review. Agent identity and model configuration live in
+by the primary. Only the primary initiates review.
+If the user directly assigns review, proceed under user authority. Agent identity and model configuration live in
 .codex/agents/*.toml; the descriptions below are summaries. When in conflict,
 the TOML developer_instructions take precedence.
 
@@ -548,7 +550,9 @@ Agent selection follows three principles. The detailed role descriptions and
 
 1. Each agent declares what it handles in its TOML description. The primary
    reads descriptions to match task shape to agent, preferring the cheapest
-   capable option first. Escalate only after concrete evidence of insufficiency.
+   capable option first. Escalate only after at least two substantiated indicators of
+insufficiency (tool error, timeout, incorrect output, or explicit
+agent declaration of incapacity).
 
 2. Implementation writers (implementer, fixer) are mutually exclusive per
    module. Read-only agents (code_mapper, reviewer_module,
@@ -778,7 +782,8 @@ is required.
      cite the contextual source of the decision.
   4. If non-material, reversible, within-goal, and no evidence / public /
      risk impact:
-     choose reasonable default; disclose material assumption.
+     choose the safest reversible default (read-only or no-op); disclose
+the assumption and the chosen default.
   5. Any remaining unsafe or unmatched case:
      ask one concise question rather than falling through.
 The materially_affects list is a minimum, not an exhaustive safe harbor: ask
@@ -903,7 +908,9 @@ templates below.
 
 TAINTED_CONTENT and CONTROL_VIOLATION are secondary classifications applied
 by the primary during acceptance — agents do not self-report these classes
-in their RESULT.
+in their RESULT. Late advisor findings are reclassified EXPERT_ADVISORY →
+ADVISORY_UNVERIFIED (stale). Unauthorized nested findings are also
+reclassified to ADVISORY_UNVERIFIED by the primary.
 
 REPORTING AND AUDIT
 -------------------

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#656d76"/>
+    </marker>
+    <style>
+      .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; rx: 8; }
+      .box-primary { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.5; rx: 8; }
+      .title { font-size: 15px; font-weight: 600; fill: #1f2328; }
+      .subtitle { font-size: 12px; fill: #656d76; }
+      .model { font-size: 15px; font-weight: 600; fill: #0550ae; }
+      .role { font-size: 12px; fill: #1f2328; }
+      .caption { font-size: 13px; fill: #656d76; }
+      .note { font-size: 12px; fill: #656d76; }
+    </style>
+  </defs>
+
+  <!-- top requirement -->
+  <text x="360" y="34" text-anchor="middle" class="title">你的一句话需求</text>
+  <line x1="360" y1="44" x2="360" y2="64" stroke="#656d76" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- primary agent -->
+  <rect class="box-primary" x="270" y="68" width="180" height="76" rx="8"/>
+  <text x="360" y="98" text-anchor="middle" class="title">主 Agent</text>
+  <text x="360" y="118" text-anchor="middle" class="subtitle">项目经理：拆任务 · 派活 · 收尾</text>
+  <text x="360" y="134" text-anchor="middle" class="subtitle">整合（自身不写业务代码）</text>
+
+  <!-- connector trunk -->
+  <line x1="360" y1="144" x2="360" y2="180" stroke="#656d76" stroke-width="1.5"/>
+  <line x1="130" y1="200" x2="590" y2="200" stroke="#656d76" stroke-width="1.5"/>
+  <line x1="130" y1="200" x2="130" y2="232" stroke="#656d76" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="360" y1="200" x2="360" y2="232" stroke="#656d76" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="590" y1="200" x2="590" y2="232" stroke="#656d76" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- sub agent 1 -->
+  <rect class="box" x="40" y="236" width="180" height="100" rx="8"/>
+  <text x="130" y="270" text-anchor="middle" class="model">deepseek-flash</text>
+  <text x="130" y="296" text-anchor="middle" class="role">执行主力</text>
+  <text x="130" y="316" text-anchor="middle" class="role">功能开发 · 跨模块对接</text>
+
+  <!-- sub agent 2 -->
+  <rect class="box" x="270" y="236" width="180" height="100" rx="8"/>
+  <text x="360" y="270" text-anchor="middle" class="model">deepseek-pro</text>
+  <text x="360" y="296" text-anchor="middle" class="role">只读审查员</text>
+  <text x="360" y="316" text-anchor="middle" class="role">架构风险 · 安全审计</text>
+
+  <!-- sub agent 3 -->
+  <rect class="box" x="500" y="236" width="180" height="100" rx="8"/>
+  <text x="590" y="270" text-anchor="middle" class="model">GLM-5-2</text>
+  <text x="590" y="296" text-anchor="middle" class="role">高级攻坚手</text>
+  <text x="590" y="316" text-anchor="middle" class="role">高难可视化 · 救场</text>
+
+  <!-- caption -->
+  <text x="360" y="380" text-anchor="middle" class="caption">并行子 Agent：彼此平级，仅接收主 Agent 指令</text>
+  <text x="360" y="404" text-anchor="middle" class="note">GLM-5-2 可按需替换为 K3 / Qwen-V3.8 / 5.6-Sol 等模型</text>
+</svg>

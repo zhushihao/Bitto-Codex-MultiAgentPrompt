@@ -1,6 +1,6 @@
 # Bitto-Codex-MultiAgentPrompt
 
-> 多 Agent 协作规范（prompt v1），让主 Agent 自动拆分复杂任务、并行派发给子 Agent、独立审查、整合交付。适用于 GLM-5-2、Bitto 网关及各类 Agent 框架。
+> 多 Agent 协作规范（prompt v1），让主 Agent 自动拆分复杂任务、并行派发给子 Agent、独立审查、整合交付。适用于 glm-5-2、Bitto 网关及各类 Agent 框架。
 
 ---
 
@@ -32,7 +32,7 @@
 
 ## 配套工具：多模型路由
 
-本规范使用三个底层模型（deepseek-flash、deepseek-pro、GLM-5-2），通过 6 个角色化子 Agent 按任务场景分工（见 `.codex/agents/` 目录）。**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**——只需确保 Agent 框架中对应的模型名称映射一致即可。多模型路由（将不同模型统一接入同一入口，按 `model` 字段分发请求）属于运行环境配置，可自行搭建或选用现有工具。
+本规范使用三个底层模型（deepseek-flash、deepseek-pro、glm-5-2），通过 6 个角色化子 Agent 按任务场景分工（见 `.codex/agents/` 目录）。**glm-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**——只需确保 Agent 框架中对应的模型名称映射一致即可。多模型路由（将不同模型统一接入同一入口，按 `model` 字段分发请求）属于运行环境配置，可自行搭建或选用现有工具。
 
 以 Codex 场景为例，可使用 [CCSwitchMulti](https://github.com/BigStrongSun/ccswitchmulti) 在 Codex 后方部署本地代理，将 OpenAI 订阅、DeepSeek、GLM、本地模型等统一接入，实现主 Agent 用官方模型决策与把关、执行与审查任务路由至更经济模型的效果。详细配置参见其 [Codex 多路由使用说明](https://github.com/BigStrongSun/ccswitchmulti/blob/main/docs/guides/codex-multirouter-guide-zh.md)。
 
@@ -50,8 +50,8 @@
   - **implementer**（deepseek-flash·可写）：定义清晰的功能开发、跨模块对接、前端页面、测试用例、CI/文档与仓库组装。
   - **reviewer_module**（deepseek-pro·只读）：模块级独立审查——检查正确性、测试覆盖、行为回归，返回具体缺陷。
   - **reviewer_adversarial**（deepseek-pro·只读）：全局对抗性审查——跨模块拉通寻找架构级风险、合约违反、数据暴露路径。
-  - **advisor**（GLM-5-2·只读）：架构仲裁与非阻塞咨询，不持文件所有权。
-  - **fixer**（GLM-5-2·可写）：高难度/跨域/救场实现，处理模糊需求、安全关键任务与 implementer 失败后的恢复。
+  - **advisor**（glm-5-2·只读）：架构仲裁与非阻塞咨询，不持文件所有权。
+  - **fixer**（glm-5-2·可写）：高难度/跨域/救场实现，处理模糊需求、安全关键任务与 implementer 失败后的恢复。
 - **信箱通信（mailbox）**：主 Agent 与子 Agent 之间以存放在 Git 公共目录下的**结构化工单（envelope）**进行通信。每个工单包含唯一编号、版本号和内容指纹，确保消息不丢失、不重复、不混淆。
 - **触发条件（M1–M7）**：规范定义了 7 类"必须启动正式拆解流程"的场景——包括项目级评估、跨模块变更、发布操作、非平凡前端任务等。命中任一条件，主 Agent 必须走完整派单流程。
 - **回退机制（fallback）**：implementer 连续两次无法完成同一块任务时，主 Agent 将该范围移交至 fixer 处理；仅当此链路仍失败时，主 Agent 自行兜底并在响应中如实披露。
@@ -71,7 +71,7 @@ git clone https://github.com/zhushihao/Bitto-Codex-MultiAgentPrompt.git
 curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPrompt/main/AGENTS.md
 ```
 
-确认 Agent 框架中三个底层模型可用（deepseek-flash、deepseek-pro、GLM-5-2，名称映射一致即可）。若使用 Codex，`.codex/agents/` 目录中的 TOML 文件会自动配置六类子 Agent；其他框架直接基于 `AGENTS.md` 的角色描述工作。之后正常下达任务，主 Agent 会自动依规处理。
+确认 Agent 框架中三个底层模型可用（deepseek-flash、deepseek-pro、glm-5-2，名称映射一致即可）。若使用 Codex，`.codex/agents/` 目录中的 TOML 文件会自动配置六类子 Agent；其他框架直接基于 `AGENTS.md` 的角色描述工作。之后正常下达任务，主 Agent 会自动依规处理。
 
 ### 备选：作为 system prompt 粘贴
 
@@ -88,7 +88,7 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 3. 规范判定命中 **M7（非平凡前端——涉及响应式交互、多段布局与前端逻辑）**，主 Agent 执行派单：
    - `deepseek-flash`（reasoning_effort=max）——实现组件、样式与基本验证；
    - `deepseek-pro`（reasoning_effort=medium）——对成品进行正确性审查；
-   - 若遇跨域数据源或复杂可视化难点，`GLM-5-2`（reasoning_effort=high）被调用攻坚。
+   - 若遇跨域数据源或复杂可视化难点，`glm-5-2`（reasoning_effort=high）被调用攻坚。
 4. 主 Agent 等待子 Agent 交付 → 进行集成验收（桌面/移动端渲染、交互功能、控制台无报错）→ 输出**一份整合后的结果**。
 
 你只需下达上述一条指令。
@@ -101,10 +101,10 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 |---|---|
 | 功能实现、模块对接、测试编写、文档与仓库组装 | `deepseek-flash`（reasoning_effort=max） |
 | Bug 定位、架构审计、安全评估、边界条件验证 | `deepseek-pro`（reasoning_effort=medium，只读） |
-| 模糊需求、跨系统集成、高难度可视化、高风险或救场实施 | `GLM-5-2`（reasoning_effort=high） |
+| 模糊需求、跨系统集成、高难度可视化、高风险或救场实施 | `glm-5-2`（reasoning_effort=high） |
 | 文件扫描、证据抽取、机械检查 | `deepseek-flash`（reasoning_effort=medium） |
 
-> reasoning_effort 是模型思考强度设定（max / high / medium），主 Agent 在派单时自动配置。成本顺序：deepseek-flash < deepseek-pro < GLM-5-2。主 Agent 会优先选择成本较低的模型，仅在证据不足时升级。
+> reasoning_effort 是模型思考强度设定（max / high / medium），主 Agent 在派单时自动配置。成本顺序：deepseek-flash < deepseek-pro < glm-5-2。主 Agent 会优先选择成本较低的模型，仅在证据不足时升级。
 
 ---
 
@@ -114,7 +114,7 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 可以。将 `AGENTS.md` 放至项目根目录即可。规范本身是写给 Agent 阅读的，你只需正常下达任务。
 
 **Q：六个子 Agent 都需要单独申请和付费吗？**
-是的，需要在你使用的 Agent 框架或网关中保证对应的模型可用。默认使用 deepseek-flash、deepseek-pro、GLM-5-2；**GLM-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**，只需名称映射一致即可。本规范仅定义协作逻辑，不绑定特定模型。
+是的，需要在你使用的 Agent 框架或网关中保证对应的模型可用。默认使用 deepseek-flash、deepseek-pro、glm-5-2；**glm-5-2 可按需替换为 K3、Qwen-V3.8、5.6-Sol 等其他模型**，只需名称映射一致即可。本规范仅定义协作逻辑，不绑定特定模型。
 
 **Q：子 Agent 会互相串扰或无限嵌套吗？**
 不会。规范强制所有子 Agent 处于第一层，禁止再派生子 Agent。只有主 Agent 有权派发任务和发起审查。
@@ -158,7 +158,7 @@ curl -OL https://raw.githubusercontent.com/zhushihao/Bitto-Codex-MultiAgentPromp
 
 ## 修订历史
 
-- 2026-07-29：初始发布。多 Agent 协作规范（第一版），含信箱协议（基于 Git 公共目录）、任务工单、并行派发、独立审查与回退机制；适配模型 deepseek-flash / deepseek-pro / GLM-5-2。
+- 2026-07-29：初始发布。多 Agent 协作规范（第一版），含信箱协议（基于 Git 公共目录）、任务工单、并行派发、独立审查与回退机制；适配模型 deepseek-flash / deepseek-pro / glm-5-2。
 
 ---
 

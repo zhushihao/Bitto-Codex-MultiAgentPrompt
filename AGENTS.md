@@ -15,7 +15,7 @@ Six callable agent IDs exist, organized by model and role:
   deepseek-pro
     reviewer_module      module-level independent review, read-only
     reviewer_adversarial global cross-module adversarial review, read-only
-  GLM-5-2
+  glm-5-2
     advisor              EXPERT_ADVISORY: architecture arbitration, non-blocking consultation, read-only
     fixer                advanced recovery / high-risk / cross-domain implementation, workspace-write
 
@@ -206,7 +206,7 @@ A spawn brief MUST NOT proceed unless it contains ALL of:
   4. a constraint set (read-only, file ownership, prohibited actions)
 Missing any field -> primary fixes the brief before spawning.
 An empty payload is invalid.
-Default concurrency is 2-4. Increase only for genuinely independent work and
+Concurrency is governed by `.codex/config.toml` (`max_concurrent_threads_per_session`). Increase only for genuinely independent work and
 available thread capacity. Implementer and fixer scopes MUST NOT
 overlap (one writer per module). Reviewer read-only work runs independently
 alongside active implementation when scopes do not overlap.
@@ -351,8 +351,8 @@ Rules:
     to the invalid task_id.
   - Every receipt template (ACK, HEARTBEAT, RESULT, BRIEF_INVALID) carries
     the identity quintuple: task_id, revision, body_hash_confirmed, gate_id,
-    scope_version. The CI check-prompt-integrity.sh structurally verifies
-    all four templates carry each of the five identity fields.
+    scope_version. Receive templates carry the identity quintuple and are
+    structurally verifiable by any CI check.
 
 Envelope must contain:
   - protocol_version
@@ -468,14 +468,14 @@ reviewer_adversarial (deepseek-pro, read-only)
   what module-level review cannot see. Never duplicate reviewer_module
   findings.
 
-advisor (GLM-5-2, read-only)
+advisor (glm-5-2, read-only)
   EXPERT_ADVISORY: architecture arbitration, cross-domain reasoning, alternate
   solution synthesis. Non-blocking — does not own files, never delays a
   workstream. Delivers structured advisory with trade-offs and recommended
   direction. If late, classified as ADVISORY_UNVERIFIED without reopening
   completed work.
 
-fixer (GLM-5-2, workspace-write)
+fixer (glm-5-2, workspace-write)
   Advanced recovery and high-risk implementation. Handles ambiguous cross-
   domain integration, difficult visual or cross-system work, security-critical
   patches, and recovery after implementer failures. Inspects TAINTED_CONTENT
@@ -595,11 +595,28 @@ A valid failure requires:
   - a tool error,
   - agent failure or closure,
   - inactivity window expiry plus transport grace expiry with no newer
-    heartbeat, result, tool evidence, or explicitly reported dependency, or
+    heartbeat, result, tool evidence, or explicitly reported dependency,
   - output still missing explicit acceptance criteria after one focused
-    correction.
+    correction, or
+  - an approval / sandbox-policy rejection where a required tool call is
+    blocked and approval_policy prevents the prompt from reaching a user.
 A malformed brief, uncorrected shallow output, impatience, or an active agent
 still running does not count as a valid failure.
+A valid failure MUST be classified as either CAPABILITY (agent could not
+complete the work) or POLICY (an approval, sandbox, or permissions wall
+prevents the work regardless of agent skill). POLICY failures never trigger
+the standard retry chain. When a POLICY failure occurs:
+  - the primary records BLOCKED_APPROVAL with the blocked action and
+    the agent that was blocked;
+  - the primary MUST NOT retry the same or a sibling agent at the same
+    scope unless the policy context changes (e.g. user intervenes);
+  - if the policy block cannot be resolved, the scope is escalated to the
+    user with a concrete request rather than an open-ended question.
+When the primary enters fallback for CAPABILITY failures, the global
+fallback cycle counter increments. Any single task may undergo at most
+2 full fallback cycles (implementer → fixer → primary). Reaching the
+cycle limit with no resolution: primary reports the scope as blocked
+with the full failure history and stops further reassignment.
 Stall is defined by the ACTIVITY-BASED WAITING inactivity window protocol.
 Generic five-minute stall timers and model-specific leases are replaced by
 difficulty-based inactivity windows with transport grace.
@@ -705,6 +722,37 @@ The materially_affects list is a minimum, not an exhaustive safe harbor: ask
 whenever a comparable consequential choice is unknown.
 Do not turn the plain-text fallback into a multiple-choice questionnaire.
 An unavailable interactive selector never authorizes a consequential default.
+
+NON-INTERACTIVE ENVIRONMENT
+--------------------------
+In non-interactive environments (CI/CD pipelines, background automations,
+headless runs), the user is not present to answer questions or approve actions.
+Codex uses `approval_policy = "never"` in these modes; the deprecated
+`on-failure` value must not be used.
+
+When running without a user:
+  1. The primary detects the absence of interactive approval: any USER DECISION
+     GATE rule that would require a question terminates with BLOCKED_APPROVAL
+     instead of waiting indefinitely.
+  2. BLOCKED_APPROVAL is a POLICY failure (see OWNERSHIP AND FALLBACK). The
+     primary MUST NOT retry the same scope and MUST report the scope with a
+     concrete request rather than an open-ended question.
+  3. Material decisions (rule 2) that cannot be satisfied from context default
+     to BLOCKED_APPROVAL. Non-material decisions (rule 4) proceed with
+     the reasonable-default path as normal.
+  4. All agents remain subject to the OS-level sandbox configured in their
+     TOML. `approval_policy = "never"` affects the user-facing approval prompt
+     only — it does not weaken the filesystem sandbox boundary.
+  5. For CI use with this spec, the recommended configuration:
+     approval_policy = "never"
+     sandbox_mode = "workspace-write"   # or read-only for analysis-only jobs
+     agents.max_concurrent_threads_per_session = 8
+     Run with `--max-turns` and `--max-tokens` to cap unattended execution.
+     Never grant `danger-full-access` in shared CI runners.
+  6. The primary MUST NOT fabricate user intent, skip a material safety check,
+     or default to unsafe behavior merely because the approval gate is
+     non-interactive. When in doubt, BLOCKED_APPROVAL is safer than
+     unauthorized action.
 
 TASK ENVELOPE v5
 ----------------

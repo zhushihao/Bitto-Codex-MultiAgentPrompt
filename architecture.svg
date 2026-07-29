@@ -55,8 +55,8 @@
   <text x="360" y="318" text-anchor="middle" class="agent-name">reviewer_adversarial</text>
   <text x="360" y="336" text-anchor="middle" class="agent-role">跨模块对抗 · 架构风险</text>
 
-  <!-- ===== Column 3: GLM-5-2 ===== -->
-  <text x="590" y="216" text-anchor="middle" class="model-label">GLM-5-2</text>
+  <!-- ===== Column 3: glm-5-2 ===== -->
+  <text x="590" y="216" text-anchor="middle" class="model-label">glm-5-2</text>
   <!-- advisor (read) -->
   <rect class="box-read" x="500" y="226" width="180" height="62" rx="7"/>
   <text x="590" y="248" text-anchor="middle" class="agent-name">advisor</text>
@@ -75,5 +75,5 @@
   <text x="260" y="472" class="note">只读（read-only）</text>
   <rect class="box-write" x="380" y="460" width="14" height="14" rx="3"/>
   <text x="400" y="472" class="note">可写（workspace-write）</text>
-  <text x="360" y="498" text-anchor="middle" class="note">GLM-5-2 可替换为 K3 / Qwen-V3.8 / 5.6-Sol 等；路由自行配置</text>
+  <text x="360" y="498" text-anchor="middle" class="note">glm-5-2 可替换为 K3 / Qwen-V3.8 / 5.6-Sol 等；路由自行配置</text>
 </svg>

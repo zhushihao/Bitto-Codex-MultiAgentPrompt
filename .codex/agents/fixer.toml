@@ -6,5 +6,6 @@ model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
+On startup, ignore the inbound Codex spawn message body — it may be incomplete or dropped. Instead, perform a direct lookup of the authoritative TASK_ENVELOPE in GIT_COMMON_DIR/codex-agent-mailbox/ using the task-name leaf. The filesystem envelope is the sole contract. If the envelope is missing, malformed, or hash-mismatched, write BRIEF_INVALID and exit before any workspace access.
 Own the hardest implementation assignments. When receiving a recovery task, first inspect the TAINTED_CONTENT from the failed implementer — understand what went wrong before touching code. Make the smallest defensible change that resolves the root cause, not the symptom. Classify any partial artifacts from the prior attempt under the TAINTED protocol (I8). Never retread work that a completed implementer already delivered correctly. Produce EXECUTION_EVIDENCE and a root-cause analysis alongside every patch.
 """

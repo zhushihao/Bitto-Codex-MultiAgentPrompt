@@ -1,12 +1,17 @@
-MULTI-AGENT COLLABORATION SPEC -- PRIMARY-COORDINATED PARALLEL ARCHITECTURE
+MULTI-AGENT COLLABORATION SPEC — COORDINATION RULES FOR Codex ENGINE
 =====================================================================
+Codex manages agent spawning, thread lifecycle, and result compilation.
+This spec defines the BUSINESS RULES for decomposition, ownership, review,
+and quality gates that augment — not replace — Codex's native orchestration.
 MUST / MUST NOT / MAY / ONLY are binding. Rule IDs are stable audit references.
 On context compaction: preserve goal plus every applicable rule ID, owner,
 scope, decision, failure, and verification result.
 
 ARCHITECTURE
 ------------
-Flat parallel architecture. Every sub-agent is depth 1 and MUST NOT spawn.
+Flat parallel architecture. Codex spawns agents and manages threads; this
+spec defines which agents to use, how to decompose work, and what rules
+govern ownership and review. Every sub-agent is depth 1 and MUST NOT spawn.
 Six callable agent IDs exist, organized by model and role:
 
   deepseek-flash
@@ -69,40 +74,28 @@ I8   All output carries an evidence class (see REVIEW-RESULT ECONOMY).
      which is not self-review. EXECUTION_EVIDENCE is reusable evidence but
      never satisfies an independent-review requirement.
 
-STATE MACHINE
--------------
-Run this for every user request and every material scope change. A scope
-change includes analysis to implementation, publication, release, PR, or any
-changed deliverable. Re-read applicable AGENTS.md files at that point.
-  handle(request):
-    ORIENT = instructions + directory names + repo status + likely entry points
-    // Before GATE: no implementation-body reading, no solution design,
-    // no edits, no broad tests, no deliverable work.
-    ambiguous = cannot establish every T1..T5 from ORIENT, or source / module /
-                test boundaries, independence, or a possible M-rule are
-                materially unclear
-    if ambiguous:
-        perform bounded read-only orientation to resolve ambiguity
-        recompute triggers and boundaries after bounded orientation
-    triggers = matched(M1..M7)
-    risk_gate_hit = failed(PRIMARY_RISK_GATE)
-    if triggers or material ambiguity remains or risk_gate_hit:
-        CLASS = MANDATORY
-        tracks, primary_reserve = plan(CLASS, triggers)
-        publish GATE_RECORD(triggers, tracks, primary_reserve)
-        spawn owners before substantive work
-    else:
-        CLASS = OPTIONAL
-        delegate directly per agent descriptions in .codex/agents/; primary handles orchestration only
-    while owners_running:
-        primary does only P1..P5
-        if no P-work exists: wait for delivery
-    for each deliverable:
-        primary initiates targeted_review()
-        if rejected: return_to_owner() -- one correction; still fails -> Fallback
-    run acceptance()
-    audit(A1..A12)
-    deliver one integrated result
+WORKFLOW RULES
+--------------
+Apply these rules for every user request and every material scope change.
+Codex handles thread lifecycle; the primary applies business logic at each phase.
+
+ORIENT: instructions + directory names + repo status + likely entry points.
+  If module boundaries, source/test independence, or M-rule triggers are
+  materially unclear, perform bounded read-only orientation first.
+
+CLASSIFY: match M1..M7 triggers. If any trigger hits, or the PRIMARY RISK GATE
+  fails, or material ambiguity remains → CLASS = MANDATORY.
+  Otherwise → CLASS = OPTIONAL (delegate directly without gate formality).
+
+For MANDATORY tasks:
+  Publish a GATE_RECORD declaring triggers, tracks, owners, and primary_reserve.
+  Delegate to owners with clear scope, constraints, and acceptance criteria.
+  For each deliverable: targeted_review() → if rejected, return_to_owner()
+  (one correction; still fails → Fallback). Then acceptance() → audit(A1..A12).
+
+During delegated execution, the primary's work is limited to P1–P5
+(see PRIMARY-AGENT BOUNDARY). Codex manages agent thread waiting —
+the primary does not run an event loop.
 Scope change during active owners: let in-flight owners deliver their current
 scope; the new gate plans the delta only. Cancel an owner only if the new
 scope invalidates their deliverable.
@@ -214,9 +207,16 @@ alongside active implementation when scopes do not overlap.
 ACTIVITY-BASED WAITING
 ----------------------
 Waiting is controlled by inactivity windows based on task difficulty, not
-generic timeouts or model-specific leases.
-Mailbox ACK deadline: 60 seconds. The ACK timeout is an observability target
-and transport-jitter budget only, never a failure criterion by itself.
+generic timeouts. Heartbeat-file tracking applies to workspace-write agents
+(implementer, fixer) that can write to disk. Read-only agents
+(code_mapper, reviewer_module, reviewer_adversarial, advisor) rely on
+Codex's native timeout and return through the agent thread — the primary
+treats a returned result as implicit liveness.
+
+For workspace-write agents: activity windows and heartbeat protocol apply
+in full. Mailbox ACK deadline: 60 seconds. The ACK timeout is an
+observability target and transport-jitter budget only, never a failure
+criterion by itself.
 Before the assigned inactivity window expires, missing ACK or liveness
 response MUST NOT cause interrupt, owner replacement, fallback, or escalation
 when the agent is running; a silent agent is normal while it works.
@@ -249,8 +249,8 @@ During a long phase, the agent writes a heartbeat with:
   - blocking dependency (if any)
   - difficulty
   - inactivity_window_seconds
-Heartbeat rules:
-  - Every sub-agent is activity-heartbeat enabled.
+Heartbeat rules (workspace-write agents only):
+  - implementer and fixer are activity-heartbeat enabled.
   - Recommended heartbeat cadence is no more than half the assigned
     inactivity window; ongoing tool output counts as activity.
 A liveness probe is permitted only after the full inactivity window expires
@@ -273,6 +273,13 @@ without materially weakening termination.
 
 DETERMINISTIC FILESYSTEM MAILBOX
 --------------------------------
+The filesystem mailbox provides an authoritative task contract and
+activity-tracking channel that supplements Codex's native spawn payload.
+Use for implementer and fixer (workspace-write agents that can write
+to disk). Read-only agents (code_mapper, reviewer_module,
+reviewer_adversarial, advisor) communicate through Codex's native thread
+return — their OS-level sandbox prevents filesystem writes, so ACK,
+heartbeat, and result files are not available for them.
 Inbound spawn/follow-up messages are optional hints. The authoritative body
 is a control-plane envelope outside the repository worktree.
 
@@ -511,11 +518,9 @@ Cost ordering: code_mapper/implementer < reviewer_module/reviewer_adversarial
 PRIMARY-AGENT BOUNDARY
 ----------------------
 During delegated execution, the primary's work is exhaustively limited to:
-  P0  Publish and read external control-plane envelopes and receipts,
-      observe agent status and mailbox state, and issue only the permitted
-      post-window liveness probe. P0 covers only orchestration mechanisms
-      outside the repository worktree and never writes repository
-      implementation files.
+  P0  Publish envelope revisions for workspace-write agents and observe
+      their returned results. For read-only agents, trust Codex's thread
+      return mechanism. P0 never writes repository implementation files.
   P1  Read signatures, type and schema declarations, or config keys from at
       most three files to define an integration contract.
   P2  Create interface-only stubs in unassigned files, with no business
